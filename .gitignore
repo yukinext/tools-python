@@ -102,3 +102,10 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# yuki
+out/
+html/
+_*.txt
+.DS_Store
+cred.json
