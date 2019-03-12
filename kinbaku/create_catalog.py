@@ -108,7 +108,7 @@ def main():
     parser.add_argument("--oauth_json_filename", 
                         default=os.path.join(
                                 os.path.dirname(os.path.abspath(sys.argv[0])),
-                                "My_Project_81200-9c7848aee338.json"))
+                                "cred.json"))
     parser.add_argument("--sn_shop_info", default="Shop Info")
     args = parser.parse_args()
     
