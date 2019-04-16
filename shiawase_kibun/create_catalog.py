@@ -133,47 +133,65 @@ def main():
     
     detail_infos = dict() # key: date, value: DetailInfo
     for target_fn in sorted(pathlib.Path(args.work_dir).glob("*.html")):
+        if not target_fn.stem.isdigit():
+            logger.info("skip file : {}".format(target_fn.name))
+            continue
+        
         target_page_id = int(target_fn.stem)
         if target_page_id in processed_page_ids:
             logger.info("skip : {:d}".format(target_page_id))
             continue
         
-        logger.info("start : {:d}".format(target_page_id))
-        soup = BeautifulSoup(open(target_fn).read(), "lxml")
-        target_date = None
-        m = RE_DATE_.search(soup.strong.text)
-        if m:
-            target_date = datetime.date(*[int(s) for s in m.groups()])
-        detail_info = DetailInfo(
-                target_page_id,
-                target_date,
-                )
-        detail_infos[target_page_id] = detail_info
-        tables = soup.find_all("table")[3:-1]
-        
-        category = None
-        for t in tables:
-            if not "class" in t.attrs: # title table
-                strongs = [s.text.strip() for s in t.find_all("strong") if len(s.text.strip())]
-                if len(strongs) == 1:
-                    category = strongs[0]
-                elif 1 < len(strongs): # 1st category
-                    category = strongs[1]
-            else: # shop table
-                # ls = t.find("td", "style21").text.splitlines() # page_id: 3871 is not valid
-                tds = t.find_all("td")
-                ls = [""]
-                for td in tds:
-                    if td.strong and len(td.strong.text.strip()):
-                        ls = [l.strip() for l in td.text.splitlines()]
-                        break
-                if -1 < ls[0].find("『"): # shop info
-                    name = ls[0]
-                    if ls[0].startswith("『"):
-                        name = ls[0][1:-1]
-                    detail = "\n".join([l for l in ls[1:] if len(l)])
-                    detail_info.shop_infos.append(ShopInfo(category, name, detail))
-        logger.debug(detail_info)
+        try:
+            logger.info("start : {:d}".format(target_page_id))
+            soup = BeautifulSoup(open(target_fn).read(), "lxml")
+            target_date = None
+            m = RE_DATE_.search(soup.strong.text)
+            if m:
+                target_date = datetime.date(*[int(s) for s in m.groups()])
+            detail_info = DetailInfo(
+                    target_page_id,
+                    target_date,
+                    )
+            detail_infos[target_page_id] = detail_info
+            tables = soup.find_all("table")[3:-1]
+            
+            category = None
+            for t in tables:
+                if not "class" in t.attrs: # title table
+                    strongs = [s.text.strip() for s in t.find_all("strong") if len(s.text.strip())]
+                    if len(strongs) == 1:
+                        category = strongs[0]
+                    elif 1 < len(strongs): # 1st category
+                        category = strongs[1]
+                else: # shop table
+                    # ls = t.find("td", "style21").text.splitlines() # page_id: 3871 is not valid
+                    tds = t.find_all("td")
+                    ls = [""]
+                    for td in tds:
+                        if td.strong and len(td.strong.text.strip()):
+                            ls = [l.strip() for l in td.text.splitlines()]
+                            break
+                    if -1 < ls[0].find("『"): # shop info
+                        name = ls[0]
+                        if ls[0].startswith("『"):
+                            name = ls[0][1:-1]
+                        detail = "\n".join([l for l in ls[1:] if len(l)])
+                        detail_info.shop_infos.append(ShopInfo(category, name, detail))
+            logger.debug(detail_info)
+        except AttributeError:
+            logger.exception("not expected format.")
+            logger.info("remove : {:d}".format(target_page_id))
+            def get_new_fn(from_path, prefix_mark, prefix_times):
+                prefix = prefix_mark * prefix_times
+                to_path = from_path.with_name(prefix + from_path.name)
+                if to_path.exists():
+                    return get_new_fn(from_path, prefix_mark, prefix_times + 1)
+                return to_path
+            new_target_fn = get_new_fn(target_fn, "_", 1)
+            logger.info("rename : {} -> {}".format(target_fn.name, new_target_fn.name))
+            target_fn.rename(new_target_fn)
+            
 
     if args.is_skip_write_to_gspread:
         logger.info("skip write to gspread.")
