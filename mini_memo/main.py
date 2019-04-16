@@ -95,21 +95,47 @@ def proc_insert(args):
     with store_filename.open("w") as fp:
         yaml.dump(messages, stream=fp, allow_unicode=True, default_flow_style=False)
     
-    if args.credential_json_filename.exists():
-    # if False:
-        from evernote.api.client import EvernoteClient
-        import evernote.edam.type.ttypes as Types
-        import evernote.edam.notestore.ttypes as NSTypes
+    def get_evernote_credential(credential_json_filename):
         import json
+        if not args.credential_json_filename.exists():
+            logger.debug("credential file not found: {}".format(credential_json_filename))
+            return None
         
         j = None
         with args.credential_json_filename.open("r") as fp:
             j = json.load(fp)
         
-        client = EvernoteClient(token=j["evernote_token"])
+        if not "evernote" in j:
+            logger.debug("\"evernote\" not found in credential file: {}".format(credential_json_filename))
+            return None
+        
+        cred = j["evernote"]
+        if "enable" in cred and cred["enable"] == False:
+            logger.debug("\"evernote.enable\" is disable in credential file: {}".format(credential_json_filename))
+            return None
+        
+        if all(key in cred for key in ("developer_token", "notebook_name")):
+            return {
+                "developer_token": cred["developer_token"],
+                "notebook_name": cred["notebook_name"],
+            }
+        else:
+            logger.debug('"developer_token" or "notebook_name" are not exists in "evernote" section in credential file: {}'.format(credential_json_filename))
+
+    evernote_cred = get_evernote_credential(args.credential_json_filename)
+    if evernote_cred is None:
+        logger.info("evernote storage is disabled.")
+    else:
+        logger.info("evernote storage is enabled.")
+
+        from evernote.api.client import EvernoteClient
+        import evernote.edam.type.ttypes as Types
+        import evernote.edam.notestore.ttypes as NSTypes
+            
+        client = EvernoteClient(token=evernote_cred["developer_token"])
         note_store = client.get_note_store()
         
-        notebook_name = j["notebook_name"]
+        notebook_name = evernote_cred["notebook_name"]
         notebooks = note_store.listNotebooks()
         target_notebook = None
         for notebook in notebooks:
@@ -148,9 +174,6 @@ def proc_insert(args):
             logger.info("update note: {}".format(note_title))
             target_note.content = convert_to_evernote_format(messages)
             note_store.updateNote(target_note)
-    else:
-        logger.info("credential file not found: {}".format(args.credential_json_filename))
-        logger.debug(convert_to_evernote_format(messages))
     
 def main():
     common_parser = argparse.ArgumentParser(add_help=False)
