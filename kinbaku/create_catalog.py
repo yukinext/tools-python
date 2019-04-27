@@ -122,10 +122,17 @@ def main():
     res = requests.get(args.index_url.format(1))
     if res.ok:
         soup = BeautifulSoup(res.content, "lxml")
-        page_urls.update([urllib.parse.urljoin(args.index_url, li.a["href"]) for li in soup.find("ul", id="pageNav").find_all("li")[1:]])
+        def get_page_urls(soup, base_url):
+            last_page_url = urllib.parse.urljoin(base_url, soup.find("ul", id="pageNav").find_all("li")[-1].a["href"])
+            prefix_url, last_page_num = re.match(r"(.*)(\d+)", last_page_url).groups()
+            last_page_num = int(last_page_num)
+            return ["{}{}".format(prefix_url, page_num) for page_num in range(2, last_page_num + 1)]
+            
+        # page_urls.update([urllib.parse.urljoin(args.index_url, li.a["href"]) for li in soup.find("ul", id="pageNav").find_all("li")[1:]])
+        page_urls.update(get_page_urls(soup, args.index_url))
         detail_urls.update(get_detail_urls(soup, args.index_url))
     
-        for page_url in page_urls:
+        for page_url in sorted(page_urls):
             time.sleep(1)
             res = requests.get(page_url)
             if res.ok:
