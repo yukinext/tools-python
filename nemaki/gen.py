@@ -11,7 +11,7 @@ import argparse
 import dateutil.relativedelta
 
 TEMPLATE_WEEKDAY = {
-        0:"昼晩 {}", # 月
+        0:"昼晩 白さら", # 月
         1:"朝 、昼 {}、晩 白さら", # 火
         2:"晩 {}", # 水
         3:"朝 、昼 {}、晩 白さら", # 木
