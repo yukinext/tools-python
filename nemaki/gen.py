@@ -9,6 +9,7 @@ Created on Mon Mar  4 10:45:28 2019
 import datetime
 import argparse
 import dateutil.relativedelta
+import string
 
 TEMPLATE_WEEKDAY = {
         0:"昼晩 白さら", # 月
@@ -29,6 +30,14 @@ def valid_date(s):
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
 
+def get_replace_fields_num(format_string):
+    # num of "{}" (no name field)
+    counter = 0
+    for literal_text, field_name, format_spec, conversion in string.Formatter().parse(format_string):
+        if field_name == "":
+            counter += 1
+    return counter
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("start_date", type=valid_date, help="The Start Date - format YYYYMMDD", default=datetime.date.today(), nargs="?")
@@ -39,12 +48,18 @@ def main():
     if args.end_date is None:
         args.end_date = args.start_date + dateutil.relativedelta.relativedelta(days=-args.start_date.day, months=1)
     
-    nemaki_offset = NEMAKI_CHOICES.index(args.start)
     buf = list()
+    nemaki_choices_counter = NEMAKI_CHOICES.index(args.start)
     for offset in range((args.end_date - args.start_date).days + 1):
         target_date = args.start_date + datetime.timedelta(days=offset)
         w = target_date.weekday()
-        l = TEMPLATE_WEEKDAY[w].format(NEMAKI_CHOICES[(offset + nemaki_offset) % len(NEMAKI_CHOICES)])
+        lw = TEMPLATE_WEEKDAY[w]
+        fields_num = get_replace_fields_num(lw)
+        tmp_nemaki_fields = list()
+        for i in range(fields_num):
+            tmp_nemaki_fields.append(NEMAKI_CHOICES[nemaki_choices_counter % len(NEMAKI_CHOICES)])
+            nemaki_choices_counter += 1
+        l = lw.format(*tmp_nemaki_fields)
         buf.append("{:%Y%m%d} {}".format(target_date, l))
     
     buf.reverse()
