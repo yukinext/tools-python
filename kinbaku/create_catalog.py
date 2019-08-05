@@ -168,7 +168,7 @@ def main():
             continue
         
         logger.info("start: {:%Y-%m-%d}".format(target_date))
-        soup = BeautifulSoup(open(target_fn).read(), "lxml")
+        soup = BeautifulSoup(open(target_fn, errors="backslashreplace").read(), "lxml")
         detail_info = DetailInfo(
                 target_date,
                 soup.h3.text,
