@@ -12,7 +12,7 @@ import dateutil.relativedelta
 import string
 
 TEMPLATE_WEEKDAY = {
-        0:"昼晩 紫さら", # 月
+        0:"昼晩 {}", # 月
         1:"朝 、昼 {}、晩 白さら", # 火
         2:"晩 紫さら", # 水
         3:"朝 、昼 {}、晩 白さら", # 木
