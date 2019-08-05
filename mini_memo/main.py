@@ -116,6 +116,7 @@ def proc_insert(args):
         
         if all(key in cred for key in ("developer_token", "notebook_name")):
             return {
+                "is_sandbox": cred["sandbox"],
                 "developer_token": cred["developer_token"],
                 "notebook_name": cred["notebook_name"],
             }
@@ -132,7 +133,7 @@ def proc_insert(args):
         import evernote.edam.type.ttypes as Types
         import evernote.edam.notestore.ttypes as NSTypes
             
-        client = EvernoteClient(token=evernote_cred["developer_token"])
+        client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
         note_store = client.get_note_store()
         
         notebook_name = evernote_cred["notebook_name"]
