@@ -97,12 +97,12 @@ def proc_insert(args):
     
     def get_evernote_credential(credential_json_filename):
         import json
-        if not args.credential_json_filename.exists():
+        if not credential_json_filename.exists():
             logger.debug("credential file not found: {}".format(credential_json_filename))
             return None
         
         j = None
-        with args.credential_json_filename.open("r") as fp:
+        with credential_json_filename.open("r") as fp:
             j = json.load(fp)
         
         if not "evernote" in j:
@@ -114,14 +114,14 @@ def proc_insert(args):
             logger.debug("\"evernote.enable\" is disable in credential file: {}".format(credential_json_filename))
             return None
         
-        if all(key in cred for key in ("developer_token", "notebook_name")):
+        if all(key in cred for key in ("sandbox", "developer_token", "notebook_name")):
             return {
                 "is_sandbox": cred["sandbox"],
                 "developer_token": cred["developer_token"],
                 "notebook_name": cred["notebook_name"],
             }
         else:
-            logger.debug('"developer_token" or "notebook_name" are not exists in "evernote" section in credential file: {}'.format(credential_json_filename))
+            logger.debug('"sandbox" or "developer_token" or "notebook_name" are not exists in "evernote" section in credential file: {}'.format(credential_json_filename))
 
     evernote_cred = get_evernote_credential(args.credential_json_filename)
     if evernote_cred is None:
