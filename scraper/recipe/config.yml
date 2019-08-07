@@ -1,0 +1,11 @@
+nhk_umai:
+    enable: true
+    program_name: "NHK うまいッ！"
+    entry_urls:
+        - "http://www6.nhk.or.jp/umai/recipe/index01.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index02.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index03.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index04.html"
+    cache_dir: ~
+    processed_list_filename: ~
+    tag_names: ~
