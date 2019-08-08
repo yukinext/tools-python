@@ -109,3 +109,4 @@ html/
 _*.txt
 .DS_Store
 cred.json
+.work*/
