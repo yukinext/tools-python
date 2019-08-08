@@ -21,6 +21,8 @@ import json
 import re
 import urllib
 import time
+import hashlib
+import mimetypes
 
 import jinja2
 from evernote.api.client import EvernoteClient
@@ -53,6 +55,11 @@ class EvernoteTransrator(object):
 <!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
 <en-note>
 <h1><a href="{{ recipe.detail_url }}">{{ recipe.cooking_name }}</a></h1>
+
+{%- for image_resource in image_resources %}
+<en-media type="{{ image_resources.mime }}" hash="{{ image_resource.data.bodyHash }}" /><br />
+{%- endfor %}
+
 <h2>材料</h2>
 <ul>
 {%- for material in recipe.materials %}
@@ -82,8 +89,14 @@ class EvernoteTransrator(object):
         return "{}「{}」 {:%Y.%m.%d}".format(self.recipe.program_name, self.recipe.cooking_name, self.recipe.program_date)
 
     @property
-    def body(self):
-        return jinja2.Template(EvernoteTransrator._template).render(recipe=self.recipe)
+    def body_resources(self):
+        image_resources = []
+        
+        for image_url in self.recipe.image_urls:
+            resource = EvernoteTransrator._get_create_evernote_resource(image_url)
+            if resource:
+                image_resources.append(resource)
+        return image_resources, jinja2.Template(EvernoteTransrator._template).render(recipe=self.recipe, image_resources=image_resources)
     
     @property
     def tag_names(self):
@@ -93,11 +106,39 @@ class EvernoteTransrator(object):
         if self.site_config.get("tag_names"):
             ret.update(self.site_config["tag_names"])
         return ret
+
+    @staticmethod
+    def _get_create_evernote_resource(source_url):
+        logger.debug("get: {}".format(source_url))
+        res = requests.get(source_url)
+        if res.ok:
+            attachment_filename = pathlib.Path(urllib.parse.urlparse(source_url).path).name
+            return EvernoteTransrator._create_evernote_resource(
+                        attachment_filename, res.content, source_url=source_url)
+    
+    @staticmethod
+    def _create_evernote_resource(attachment_filename, byte_data, source_url=None):
+        data = Types.Data(
+                bodyHash=hashlib.md5(byte_data).hexdigest(),
+                size=len(byte_data),
+                body=byte_data,
+                )
+        return Types.Resource(
+                data=data,
+                mime=mimetypes.guess_type(attachment_filename)[0],
+                attributes=Types.ResourceAttributes(
+                        sourceURL=source_url,
+                        fileName=attachment_filename,
+                        ),
+                )
+
+
     
 class Recipe(object):
     def __init__(self):
         self.id = None
         self.detail_url = None
+        self.image_urls = list() # original image sourece urls
         self.cooking_name = None # 料理名
         self.program_name = None # 番組名
         self.program_date = datetime.date.today() # 番組日付
@@ -156,7 +197,7 @@ def proc_nhk_umai(args, site_config):
             logger.info("({:05d}/{:05d}) get: {:d}".format(i + 1, recipes_num, recipe.id))
             (cache_dir / str(recipe.id)).open("wb").write(res.content)
             
-
+    # get detail recipe info
     for target_fn in sorted(cache_dir.glob("[!_*]*"), key=lambda k: int(str(k.stem))):
         if not target_fn.stem.isdigit():
             logger.info("skip file : {}".format(target_fn.name))
@@ -173,6 +214,7 @@ def proc_nhk_umai(args, site_config):
             for cooking_name_node in soup.find_all("h4"):
                 recipe = copy.deepcopy(recipes[recipe_id])
                 recipe.cooking_name = cooking_name_node.text
+                recipe.image_urls = [urllib.parse.urljoin(recipe.detail_url, node["src"]) for node in cooking_name_node.parent.parent.select('img[src$="jpg"]')]
                 
                 material_title_node = cooking_name_node.parent.find(text="材料")
                 recipe_steps_title_node = cooking_name_node.parent.find(text="作り方")
@@ -218,7 +260,7 @@ def proc_nhk_umai(args, site_config):
             new_target_fn = _get_new_fn(target_fn, "_", 1)
             logger.info("rename : {} -> {}".format(target_fn.name, new_target_fn.name))
             target_fn.rename(new_target_fn)
-        
+
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
     note_store = client.get_note_store()
@@ -241,6 +283,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
         trans = EvernoteTransrator(recipe, site_config)
         note_title = trans.title
 
+        is_note_exist = False
         if is_note_exist_check:
             filter = NSTypes.NoteFilter()
             filter.notebookGuid = target_notebook.guid        
@@ -251,17 +294,19 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
             for meta_ in metalist.notes:
                 if note_title == meta_.title:
                     logger.info("skip: {} exists.".format(note_title))
-                    continue
+                    is_note_exist = True
+                    break
+        if not is_note_exist:
+            logger.info("create note: {}".format(note_title))
+            resources, body = trans.body_resources
+            note = Types.Note(title=note_title, content=body, resources=resources, notebookGuid=target_notebook.guid)
+            note.tagNames = trans.tag_names
+            note_store.createNote(note)
+            
+            with processed_list_filename.open("a") as fp:
+                fp.write("{}\n".format(recipe.id))
         
-        logger.info("create note: {}".format(note_title))
-        note = Types.Note(title=note_title, content=trans.body, notebookGuid=target_notebook.guid)
-        note.tagNames = trans.tag_names
-        note_store.createNote(note)
-        
-        with processed_list_filename.open("a") as fp:
-            fp.write("{}\n".format(recipe.id))
-        
-        time.sleep(1)
+            time.sleep(1)
 
 def _get_new_fn(from_path, prefix_mark, prefix_times):
     prefix = prefix_mark * prefix_times
@@ -303,7 +348,7 @@ def main():
     parser.add_argument("--config-yaml-filename", default=pathlib.Path(sys.argv[0]).parent / "config.yml", type=pathlib.Path)
     parser.add_argument("--work-dir", default=pathlib.Path(sys.argv[0]).parent / ".work_recipes", type=pathlib.Path, help="working directory")
     parser.add_argument("--credential-json-filename", default=pathlib.Path(sys.argv[0]).parent / "cred.json", type=pathlib.Path)
-    parser.add_argument("--skip-existed-note", action="store_true", help="check existed note and if existed skip.")
+    parser.add_argument("--no-check-existed-note", action="store_true", help="no check existed notes and append new note. if do not check existed note and skip.")
     parser.add_argument("--processed-list-filename-postfix", default="_processed_data.txt")
 
     args = parser.parse_args()
@@ -318,7 +363,7 @@ def main():
     for site in args.sites:
         if site in config:
             recipe_generator = eval("proc_{}".format(site))
-            store_evernote(recipe_generator, args, config[site], evernote_cred, is_note_exist_check=not args.skip_existed_note)
+            store_evernote(recipe_generator, args, config[site], evernote_cred, is_note_exist_check=not args.no_check_existed_note)
         else:
             logger.warn("not exist: {}".format(site))
         
