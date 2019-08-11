@@ -10,8 +10,13 @@ nhk_umai:
     processed_list_filename: ~
     tag_names: ~
 danshigohan:
-    enable: false
+    enable: true
     program_name: "テレ東 男子ごはん"
     entry_urls:
         - "https://www.tv-tokyo.co.jp/danshigohan/recipe/"
-        
+rsk_cooking_recipe:
+    enable: true
+    program_name: "RSK クッキング・レシピ"
+    entry_urls:
+        - "http://www.rsk.co.jp/tv/recipe/"
+    

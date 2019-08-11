@@ -77,6 +77,10 @@ class EvernoteTransrator(object):
     </li>
 {%- endfor %}
 </ul>
+
+{%- for important_point in recipe.important_points %}
+<strong>{{ important_point }}</strong><br/>
+{%- endfor %}
 </en-note>
 """
 
@@ -143,6 +147,7 @@ class Recipe(object):
         self.program_date = datetime.date.today() # 番組日付
         self.materials = list() # 材料
         self.recipe_steps = list() # 作り方
+        self.important_points = list()
 
 class RecipeCrawlerTemplate(object):
     site_name = ""
@@ -261,7 +266,8 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
             if m:
                 yymmdd = m.groups()[0]
                 logger.debug("program_date:{}".format(yymmdd))
-                recipe.program_date = datetime.date(year=2000 + int(yymmdd[0:2]), month=int(yymmdd[2:4]), day=int(yymmdd[4:6]))
+                # recipe.program_date = datetime.date(year=2000 + int(yymmdd[0:2]), month=int(yymmdd[2:4]), day=int(yymmdd[4:6]))
+                recipe.program_date = dateutil.parser.parse("20{}".format(yymmdd))
         return recipes
     
     def _recipe_details_generator(self, detail_soup, overview_recipe):
@@ -312,6 +318,7 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
             
             yield recipe
 
+
 class DanshigohanRecipeCrawler(RecipeCrawlerTemplate):
     site_name = "danshigohan"
 
@@ -347,6 +354,59 @@ class DanshigohanRecipeCrawler(RecipeCrawlerTemplate):
             recipe.recipe_steps.append(recipe_step.text.strip())
         
         yield recipe
+
+
+class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "rsk_cooking_recipe"
+    
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in overview_soup.find_all("div", "recipe-piece"):
+            recipe = Recipe()
+            recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
+            program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).groups()[0]
+            recipe.id = int(program_date_str)
+            recipe.program_name = self.program_name
+            recipe.program_date = dateutil.parser.parse(program_date_str)
+            recipes[recipe.id] = recipe
+
+        return recipes
+
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+        recipe.cooking_name = detail_soup.strong.text if detail_soup.strong else detail_soup.find_all("b")[1].text
+        
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.select_one('img[src$="jpg"]')["src"]))
+
+        material_title = "（{}）".format(detail_soup.find("td", align="right").b.text.strip())
+        if material_title:
+            recipe.materials.append(material_title)
+        
+        for material in detail_soup.find("div","zairyo").text.strip().splitlines():
+            if -1 < material.find("監修"):
+                break
+            if len(material):
+                recipe.materials.append(material.replace("…", ": "))
+
+        bl_counter = 0
+        for recipe_step in detail_soup.find_all("table")[-2].find_all("td")[1].text.strip().splitlines():
+            recipe_step = recipe_step.strip()
+            if 1 < bl_counter:
+                # All points after the blank line are important points
+                if len(recipe_step):
+                    recipe.important_points.append(recipe_step)
+                
+            if len(recipe_step):
+                recipe.recipe_steps.append(recipe_step)
+                bl_counter = 0
+            else:
+                bl_counter += 1
+        
+        yield recipe
+
 
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
@@ -442,6 +502,7 @@ def main():
     recipe_crawlers = dict([(crawler.site_name, crawler) for crawler in [
             NhkUmaiRecipeCrawler(),
             DanshigohanRecipeCrawler(),
+            RskCookingRecipeRecipeCrawler(),
             ]])
 
     config = yaml.load(args.config_yaml_filename.open("r").read())
@@ -451,13 +512,15 @@ def main():
     
     for site in args.sites:
         if site in config and site in recipe_crawlers:
-            recipe_crawler = recipe_crawlers[site]
             site_config = config[site]
-            recipe_crawler.init(args, site_config)
-            store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note)
+            if site_config["enable"]:
+                recipe_crawler = recipe_crawlers[site]
+                recipe_crawler.init(args, site_config)
+                store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note)
+            else:
+                logger.warn("disable: {}".format(site))
         else:
             logger.warn("not exist: {}".format(site))
-        
                     
 
 if __name__ == "__main__":
