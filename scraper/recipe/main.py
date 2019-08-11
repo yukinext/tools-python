@@ -55,6 +55,7 @@ class EvernoteTransrator(object):
     _template = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
 <en-note>
+{%- autoescape true %}
 <h1><a href="{{ recipe.detail_url }}">{{ recipe.cooking_name }}</a></h1>
 
 {%- for image_resource in image_resources %}
@@ -81,6 +82,7 @@ class EvernoteTransrator(object):
 {%- for important_point in recipe.important_points %}
 <strong>{{ important_point }}</strong><br/>
 {%- endfor %}
+{%- endautoescape %}
 </en-note>
 """
 
