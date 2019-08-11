@@ -23,6 +23,7 @@ import urllib
 import time
 import hashlib
 import mimetypes
+import inspect
 
 import jinja2
 from evernote.api.client import EvernoteClient
@@ -47,6 +48,8 @@ logger.addHandler(handler)
 yaml.add_representer(collections.OrderedDict, lambda dumper, instance: dumper.represent_mapping('tag:yaml.org,2002:map', instance.items()))
 yaml.add_representer(type(None), lambda dumper, instance: dumper.represent_scalar('tag:yaml.org,2002:null', "~"))
 yaml.add_constructor('tag:yaml.org,2002:map', lambda loader, node: collections.OrderedDict(loader.construct_pairs(node)))
+
+PROCEDURE_PREFIX = "proc_"
 
 class EvernoteTransrator(object):
     default_tag_names = ["recipe", "レシピ"]
@@ -131,8 +134,6 @@ class EvernoteTransrator(object):
                         fileName=attachment_filename,
                         ),
                 )
-
-
     
 class Recipe(object):
     def __init__(self):
@@ -144,14 +145,190 @@ class Recipe(object):
         self.program_date = datetime.date.today() # 番組日付
         self.materials = list() # 材料
         self.recipe_steps = list() # 作り方
+
+class RecipeCrawlerTemplate(object):
+    site_name = ""
+    def __init__(self):
+        pass
+
+    def init(self, args, site_config):
+        self.program_name = site_config["program_name"]
+        self.cache_dir = args.work_dir / self.__class__.site_name
+        if site_config.get("cache_dir"):
+            self.cache_dir = args.work_dir / site_config["cache_dir"]
+        
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
     
+        self.entry_urls = site_config["entry_urls"]
+    
+        self.processed_list_filename = args.work_dir / "_{}{}".format(self.__class__.site_name, args.processed_list_filename_postfix)
+        if site_config.get("processed_list_filename"):
+            self.processed_list_filename = pathlib.Path(site_config["processed_list_filename"])
+        
+
+    def process(self):
+        recipes = dict() # key: Recipe.id, value: Recipe
+
+        for entry_url in self.entry_urls:
+            res = requests.get(entry_url)
+            if res.ok:
+                soup = BeautifulSoup(res.content, "lxml")
+                recipes.update(self._get_recipe_overviews(soup, entry_url))
+
+        processed_recipe_ids = set()
+            
+        if self.processed_list_filename.exists():
+            with self.processed_list_filename.open() as fp:
+                processed_recipe_ids.update([int(l) for l in fp.readlines() if len(l.strip())])
+        
+        recipes_num = len(recipes)
+        for i, recipe in enumerate(recipes.values()):
+            if self._is_existed_recipe(recipe):
+                logger.info("{}:({:05d}/{:05d}) skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                continue
+    
+            time.sleep(1)
+            res = requests.get(recipe.detail_url)
+            if res.ok:
+                logger.info("{}:({:05d}/{:05d}) get: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
+
+        # get detail recipe info
+        for target_fn in sorted(self.cache_dir.glob("[!_*]*"), key=lambda k: self._sortkey_cache_filename(k)):
+            if not self._is_valid_cache_filename(target_fn):
+                logger.info("skip file : {}".format(target_fn.name))
+                continue
+            
+            recipe_id = self._get_recipe_id_from_cache_file(target_fn)
+            if recipe_id in processed_recipe_ids:
+                logger.info("skip : {}".format(recipe_id))
+                continue
+            
+            try:
+                logger.info("start : {}".format(recipe_id))
+                soup = BeautifulSoup(target_fn.open("r", errors="ignore").read(), "lxml")
+                for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
+                    yield self.processed_list_filename, detail_recipe
+                
+            except AttributeError:
+                logger.exception("not expected format.")
+                logger.info("remove : {:d}".format(recipe_id))
+                new_target_fn = self._get_new_fn(target_fn, "_", 1)
+                logger.info("rename : {} -> {}".format(target_fn.name, new_target_fn.name))
+                target_fn.rename(new_target_fn)
+    
+    def _is_existed_recipe(self, recipe):
+        assert isinstance(recipe, Recipe)
+        return (self.cache_dir / str(recipe.id)).exists()
+
+    def _get_new_fn(self, from_path, prefix_mark, prefix_times):
+        prefix = prefix_mark * prefix_times
+        to_path = from_path.with_name(prefix + from_path.name)
+        if to_path.exists():
+            return self._get_new_fn(from_path, prefix_mark, prefix_times + 1)
+        return to_path
+
+    def _sortkey_cache_filename(self, target_fn):
+        return int(str(target_fn.stem))
+
+    def _is_valid_cache_filename(self, target_fn):
+        return target_fn.stem.isdigit()
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return int(target_fn.stem)
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        pass
+    
+    def _recipe_details_generator(self, detail_soup, recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        pass
+
+class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "nhk_umai"
+    def __init__(self):
+        super().__init__()
+    
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        links = [a for a in overview_soup.find_all("a") if a.img]
+        for link in links:
+            recipe = Recipe()
+            recipe.detail_url = urllib.parse.urljoin(entry_url, link["href"])
+            recipe.id = int(urllib.parse.splitvalue(recipe.detail_url)[1])
+            recipe.program_name = self.program_name
+            recipes[recipe.id] = recipe
+            
+            m = re.match(r".*?(\d{6}).*", pathlib.Path(link.img["src"]).name)
+            if m:
+                yymmdd = m.groups()[0]
+                logger.debug("program_date:{}".format(yymmdd))
+                recipe.program_date = datetime.date(year=2000 + int(yymmdd[0:2]), month=int(yymmdd[2:4]), day=int(yymmdd[4:6]))
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        for cooking_name_node in detail_soup.find_all("h4"):
+            recipe = copy.deepcopy(overview_recipe)
+            recipe.cooking_name = cooking_name_node.text
+            recipe.image_urls = [urllib.parse.urljoin(recipe.detail_url, node["src"]) for node in cooking_name_node.parent.parent.select('img[src$="jpg"]')]
+            
+            material_title_node = cooking_name_node.parent.find(text="材料")
+            recipe_steps_title_node = cooking_name_node.parent.find(text="作り方")
+
+            recipe.materials = [material[1:] if material.startswith("・") else material for material in material_title_node.parent.find_next_sibling().text.splitlines() if len(material.strip())]
+            recipe.recipe_steps = [recipe_step for recipe_step in recipe_steps_title_node.parent.find_next_sibling().text.splitlines() if len(recipe_step.strip())]
+            
+            if len(recipe.materials) == 0:
+                m_buf = list()
+                for material in material_title_node.parent.next_siblings:
+                    if material == recipe_steps_title_node.parent:
+                        break
+                    if isinstance(material, bs4.NavigableString):
+                        for m in material.replace("\u3000：", "：").replace("\u3000", "\n").strip().splitlines():
+                            if len(m):
+                                if m.startswith("・"):
+                                    m_buf.append(m[1:])
+                                else:
+                                    m_buf.append(m)
+                recipe.materials = m_buf
+            
+            if len(recipe.recipe_steps) == 0:
+                recipe.recipe_steps = [recipe_step.strip() for recipe_step in recipe_steps_title_node.parent.next_siblings if isinstance(recipe_step, bs4.NavigableString) and len(recipe_step.strip())]
+            
+            if len(recipe.recipe_steps) == 0:
+                r_buf = list()
+                for recipe_step in recipe_steps_title_node.parent.next_siblings:
+                    if isinstance(recipe_step, bs4.NavigableString):
+                        if len(recipe_step.strip()):
+                            r_buf.append(recipe_step.strip())
+                    else:
+                        r_ = recipe_step.text.strip()
+                        if len(r_):
+                            for r in r_.splitlines():
+                                if len(r):
+                                    r_buf.append(r)
+                recipe.recipe_steps = r_buf
+            
+            yield recipe
+    
+
 def proc_nhk_umai(args, site_config):
+    site_name = inspect.stack()[1][3].replace(PROCEDURE_PREFIX, "", 1)
     program_name = site_config["program_name"]
-    cache_dir = args.work_dir / "nhk_umai"
+    cache_dir = args.work_dir / site_name
     if site_config.get("cache_dir"):
         cache_dir = args.work_dir / site_config["cache_dir"]
     
     cache_dir.mkdir(parents=True, exist_ok=True)
+
+    processed_list_filename = args.work_dir / "_{}{}".format(site_name, args.processed_list_filename_postfix)
+    if site_config.get("processed_list_filename"):
+        processed_list_filename = pathlib.Path(site_config["processed_list_filename"])
     
     recipes = dict() # key: Recipe.id, value: Recipe
     for entry_url in site_config["entry_urls"]:
@@ -173,9 +350,6 @@ def proc_nhk_umai(args, site_config):
                     recipe.program_date = datetime.date(year=2000 + int(yymmdd[0:2]), month=int(yymmdd[2:4]), day=int(yymmdd[4:6]))
 
     processed_recipe_ids = set()
-    processed_list_filename = args.work_dir / "_nhk_umai{}".format(args.processed_list_filename_postfix)
-    if site_config.get("processed_list_filename"):
-        processed_list_filename = pathlib.Path(site_config["processed_list_filename"])
         
     if processed_list_filename.exists():
         with processed_list_filename.open() as fp:
@@ -184,6 +358,13 @@ def proc_nhk_umai(args, site_config):
     def is_existed_recipe(recipe):
         assert isinstance(recipe, Recipe)
         return (cache_dir / str(recipe.id)).exists()
+
+    def _get_new_fn(self, from_path, prefix_mark, prefix_times):
+        prefix = prefix_mark * prefix_times
+        to_path = from_path.with_name(prefix + from_path.name)
+        if to_path.exists():
+            return self._get_new_fn(from_path, prefix_mark, prefix_times + 1)
+        return to_path
     
     recipes_num = len(recipes)
     for i, recipe in enumerate(recipes.values()):
@@ -261,6 +442,7 @@ def proc_nhk_umai(args, site_config):
             logger.info("rename : {} -> {}".format(target_fn.name, new_target_fn.name))
             target_fn.rename(new_target_fn)
 
+
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
     note_store = client.get_note_store()
@@ -279,7 +461,8 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
         target_notebook.name = notebook_name
         target_notebook = note_store.createNotebook(target_notebook)
 
-    for processed_list_filename, recipe in recipes(args, site_config):
+    # for processed_list_filename, recipe in recipes(args, site_config):
+    for processed_list_filename, recipe in recipes():
         trans = EvernoteTransrator(recipe, site_config)
         note_title = trans.title
 
@@ -307,13 +490,6 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
                 fp.write("{}\n".format(recipe.id))
         
             time.sleep(1)
-
-def _get_new_fn(from_path, prefix_mark, prefix_times):
-    prefix = prefix_mark * prefix_times
-    to_path = from_path.with_name(prefix + from_path.name)
-    if to_path.exists():
-        return _get_new_fn(from_path, prefix_mark, prefix_times + 1)
-    return to_path
 
 def _get_evernote_credential(credential_json_filename):
     if not credential_json_filename.exists():
@@ -354,16 +530,28 @@ def main():
     args = parser.parse_args()
     args.work_dir.mkdir(parents=True, exist_ok=True)
     
-    args.config_yaml_filename
+    if not args.config_yaml_filename.exists():
+        logger.error("not exists config file: {}".format(args.config_yaml_filename))
+        return
+
+    recipe_crawlers = dict([(crawler.site_name, crawler) for crawler in [
+            NhkUmaiRecipeCrawler(),
+            ]])
+
     config = yaml.load(args.config_yaml_filename.open("r").read())
     evernote_cred = _get_evernote_credential(args.credential_json_filename)
     if args.sites is None or len(args.sites) == 0:
         args.sites = [key for key in config.keys()]
     
     for site in args.sites:
-        if site in config:
-            recipe_generator = eval("proc_{}".format(site))
-            store_evernote(recipe_generator, args, config[site], evernote_cred, is_note_exist_check=not args.no_check_existed_note)
+        # if site in config:
+            # recipe_generator = eval("{}{}".format(PROCEDURE_PREFIX, site))
+            # store_evernote(recipe_generator, args, config[site], evernote_cred, is_note_exist_check=not args.no_check_existed_note)
+        if site in config and site in recipe_crawlers:
+            recipe_crawler = recipe_crawlers[site]
+            site_config = config[site]
+            recipe_crawler.init(args, site_config)
+            store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note)
         else:
             logger.warn("not exist: {}".format(site))
         
