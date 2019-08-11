@@ -391,19 +391,13 @@ class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
             if len(material):
                 recipe.materials.append(material.replace("…", ": "))
 
-        bl_counter = 0
         for recipe_step in detail_soup.find_all("table")[-2].find_all("td")[1].text.strip().splitlines():
             recipe_step = recipe_step.strip()
-            if 1 < bl_counter:
-                # All points after the blank line are important points
-                if len(recipe_step):
-                    recipe.important_points.append(recipe_step)
-                
+            if -1 < recipe_step.find("監修"):
+                break
+
             if len(recipe_step):
                 recipe.recipe_steps.append(recipe_step)
-                bl_counter = 0
-            else:
-                bl_counter += 1
         
         yield recipe
 
