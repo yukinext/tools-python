@@ -9,3 +9,9 @@ nhk_umai:
     cache_dir: ~
     processed_list_filename: ~
     tag_names: ~
+danshigohan:
+    enable: false
+    program_name: "テレ東 男子ごはん"
+    entry_urls:
+        - "https://www.tv-tokyo.co.jp/danshigohan/recipe/"
+        
