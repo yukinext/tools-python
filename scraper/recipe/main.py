@@ -194,7 +194,7 @@ class RecipeCrawlerTemplate(object):
         recipes_num = len(recipes)
         for i, recipe in enumerate(recipes.values()):
             if self._is_existed_recipe(recipe):
-                logger.info("{}:({:05d}/{:05d}) skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                logger.debug("{}:({:05d}/{:05d}) skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 continue
     
             time.sleep(1)
@@ -206,12 +206,12 @@ class RecipeCrawlerTemplate(object):
         # get detail recipe info
         for target_fn in sorted(self.cache_dir.glob("[!_*]*"), key=lambda k: self._sortkey_cache_filename(k)):
             if not self._is_valid_cache_filename(target_fn):
-                logger.info("skip file : {}".format(target_fn.name))
+                logger.debug("skip file : {}".format(target_fn.name))
                 continue
             
             recipe_id = self._get_recipe_id_from_cache_file(target_fn)
             if recipe_id in processed_recipe_ids:
-                logger.info("skip : {}".format(recipe_id))
+                logger.debug("skip : {}".format(recipe_id))
                 continue
             
             try:
@@ -586,7 +586,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
     
             for meta_ in metalist.notes:
                 if note_title == meta_.title:
-                    logger.info("skip: {} exists.".format(note_title))
+                    logger.debug("skip: {} exists.".format(note_title))
                     is_note_exist = True
                     break
         if not is_note_exist:
