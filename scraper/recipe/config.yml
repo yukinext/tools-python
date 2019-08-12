@@ -19,4 +19,18 @@ rsk_cooking_recipe:
     program_name: "RSK クッキング・レシピ"
     entry_urls:
         - "http://www.rsk.co.jp/tv/recipe/"
-    
+oshaberi:
+    enable: true
+    program_name: "ABC 上沼恵美子のおしゃべりクッキング"
+    entry_urls:
+        - "https://www.asahi.co.jp/oshaberi/main.html"
+three_minutes_cooking:
+    enable: true
+    program_name: "NTV キューピー3分クッキング"
+    entry_urls:
+        - "http://www.ntv.co.jp/3min/airdate/"
+oishimeshi:
+    enable: true
+    program_name: "CSネット コープのおいしめし"
+    entry_urls:
+        - "https://www.csnet.coop/movies/recipemovie.cgi?template=index.html"

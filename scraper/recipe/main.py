@@ -7,6 +7,7 @@ Created on Tue Aug  6 21:30:16 2019
 """
 import argparse
 import copy
+import chardet
 import datetime
 import requests
 from bs4 import BeautifulSoup
@@ -29,6 +30,10 @@ import jinja2
 from evernote.api.client import EvernoteClient
 import evernote.edam.type.ttypes as Types
 import evernote.edam.notestore.ttypes as NSTypes
+
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+urllib3.disable_warnings(InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -175,9 +180,9 @@ class RecipeCrawlerTemplate(object):
         recipes = dict() # key: Recipe.id, value: Recipe
 
         for entry_url in self.entry_urls:
-            res = requests.get(entry_url)
+            res = requests.get(entry_url, verify=False)
             if res.ok:
-                soup = BeautifulSoup(res.content, "lxml")
+                soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
                 recipes.update(self._get_recipe_overviews(soup, entry_url))
 
         processed_recipe_ids = set()
@@ -193,7 +198,7 @@ class RecipeCrawlerTemplate(object):
                 continue
     
             time.sleep(1)
-            res = requests.get(recipe.detail_url)
+            res = requests.get(recipe.detail_url, verify=False)
             if res.ok:
                 logger.info("{}:({:05d}/{:05d}) get: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
@@ -211,7 +216,8 @@ class RecipeCrawlerTemplate(object):
             
             try:
                 logger.info("start : {}".format(recipe_id))
-                soup = BeautifulSoup(target_fn.open("r", errors="ignore").read(), "lxml")
+                content = target_fn.open("rb").read()
+                soup = BeautifulSoup(content, "html5lib", from_encoding=chardet.detect(content)["encoding"])
                 for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
                     yield self.processed_list_filename, detail_recipe
                 
@@ -403,6 +409,149 @@ class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
         
         yield recipe
 
+class OshaberiRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "oshaberi"
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in overview_soup.select("td .mon,.tue,.wed,.thu,.fri"):
+            for link in item.find_all("a"):
+                recipe = Recipe()
+                recipe.detail_url = urllib.parse.urljoin(entry_url, link["href"])
+                program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).groups()[0]
+                recipe.id = int(program_date_str)
+                recipe.cooking_name = link.text.split()[-1]
+                recipe.program_name = self.program_name
+                recipe.program_date = dateutil.parser.parse(program_date_str)
+                recipes[recipe.id] = recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.select_one('img[src$="jpg"]')["src"]))
+
+        recipe_steps_title_node, material_title_node = detail_soup.find_all("table", "text2")
+        material_title = "（{}）".format(detail_soup.find("td", "making").text)
+        if material_title:
+            recipe.materials.append(material_title)
+        recipe.materials.extend([tr.text.strip().replace("\n", ": ") for tr in material_title_node.find_all("tr")])
+
+        recipe.recipe_steps = ["（{}）{}".format(i+1, tr.text.strip()) for i, tr in enumerate(recipe_steps_title_node.find_all("tr"))]
+        
+        yield recipe
+
+
+class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "three_minutes_cooking"
+
+    def _sortkey_cache_filename(self, target_fn):
+        return target_fn.stem
+
+    def _is_valid_cache_filename(self, target_fn):
+        return not target_fn.stem.startswith("_")
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return target_fn.stem
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        def get_other_recipe(detail_url):
+            res = requests.get(detail_url, verify=False)
+            if res.ok:
+                soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
+                other_recipe_node = soup.select_one("#other-recipe")
+                if other_recipe_node:
+                    other_recipe = Recipe()
+                    other_recipe.detail_url = urllib.parse.urljoin(detail_url, other_recipe_node.a["href"])
+                    other_recipe.id = re.search(r".*/(.*)\.html", other_recipe.detail_url).groups()[0]
+                    return other_recipe
+        
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in [item for item in overview_soup.find_all("div", "waku") if item.a]:
+            recipe = Recipe()
+            recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
+            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).groups()[0]
+            recipe.image_urls.append(item.img["src"])
+            recipes[recipe.id] = recipe
+
+            other_recipe = get_other_recipe(recipe.detail_url)
+            if other_recipe:
+                recipes[other_recipe.id] = other_recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+        recipe.cooking_name = detail_soup.h3.text
+        recipe.program_name = self.program_name
+        recipe.program_date = dateutil.parser.parse(recipe.id.split("_")[0])
+
+        material_title_node = detail_soup.find("div", "ingredient")
+        recipe_steps_title_node = detail_soup.find("div", "howto")
+        
+        material_title = material_title_node.h4.text.replace("材料", "").replace("(", "（").replace(")", "）").strip()
+        if material_title:
+            recipe.materials.append(material_title)
+        for material in material_title_node.find_all("tr"):
+            recipe.materials.append(": ".join([m.text for m in material.find_all("td")]))
+
+        for recipe_step in recipe_steps_title_node.find_all("tr"):
+            num, step = recipe_step.find_all("td")
+            buf = ""
+            if len(num.text.strip()):
+                buf += "（{}）".format(num.text.strip())
+            buf += step.text.strip()
+            recipe.recipe_steps.append(buf)
+        
+        yield recipe
+
+
+class OishimeshiRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "oishimeshi"
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in overview_soup.find_all("div", "titletext"):
+            recipe = Recipe()
+            tmp = item.find("p", "title")
+            recipe.detail_url = tmp.a["href"]
+            program_date_str = re.search(r"date=(\d+)\D?", recipe.detail_url).groups()[0]
+            recipe.id = int(program_date_str)
+            recipe.cooking_name = tmp.text
+            recipe.program_name = self.program_name
+            recipe.program_date = dateutil.parser.parse(program_date_str)
+            recipes[recipe.id] = recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+
+        material_title_node = detail_soup.select_one("#zairyou_box")
+        recipe_steps_title_node = detail_soup.find("table", "recipe")
+        material_title = material_title_node.p.text.replace("材料", "").replace("（", "（").replace(")", "）").strip()
+        if material_title:
+            recipe.materials.append(material_title)
+        recipe.materials.extend([": ".join([mm.text for mm in m.find_all("td") if len(mm.text.strip())]) for m in material_title_node.find_all("tr")])
+
+        for recipe_step in recipe_steps_title_node.find_all("tr"):
+            num, text, point = recipe_step.find_all("td")
+            recipe.recipe_steps.append("（{}）{}".format(num.text.strip(), text.text.strip()))
+            if len(point.text.strip()):
+                recipe.recipe_steps.append(point.text.strip())
+        
+        yield recipe
+
 
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
@@ -499,6 +648,9 @@ def main():
             NhkUmaiRecipeCrawler(),
             DanshigohanRecipeCrawler(),
             RskCookingRecipeRecipeCrawler(),
+            OshaberiRecipeCrawler(),
+            ThreeMinCookingRecipeCrawler(),
+            OishimeshiRecipeCrawler(),
             ]])
 
     config = yaml.load(args.config_yaml_filename.open("r").read())
@@ -514,9 +666,9 @@ def main():
                 recipe_crawler.init(args, site_config)
                 store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note)
             else:
-                logger.warn("disable: {}".format(site))
+                logger.warning("disable: {}".format(site))
         else:
-            logger.warn("not exist: {}".format(site))
+            logger.warning("not exist: {}".format(site))
                     
 
 if __name__ == "__main__":
