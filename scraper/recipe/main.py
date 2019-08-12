@@ -13,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 import bs4
 import logging
+import logging.handlers
 import yaml
 import collections
 import os
@@ -40,7 +41,9 @@ logger.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
-handler = logging.FileHandler(os.path.splitext(sys.argv[0])[0] + ".log")
+log_dir = pathlib.Path("./logs")
+log_dir.mkdir(parents=True, exist_ok=True)
+handler = logging.handlers.TimedRotatingFileHandler(log_dir / (os.path.splitext(sys.argv[0])[0] + ".log"), when="midnight", backupCount=31)
 handler.setFormatter(formatter)
 handler.setLevel(logging.DEBUG)
 logger.addHandler(handler)
@@ -177,6 +180,8 @@ class RecipeCrawlerTemplate(object):
         
 
     def process(self):
+        logger.info("{}: proc start".format(self.__class__.site_name))
+        
         recipes = dict() # key: Recipe.id, value: Recipe
 
         for entry_url in self.entry_urls:
@@ -189,33 +194,32 @@ class RecipeCrawlerTemplate(object):
             
         if self.processed_list_filename.exists():
             with self.processed_list_filename.open() as fp:
-                processed_recipe_ids.update([int(l) for l in fp.readlines() if len(l.strip())])
+                processed_recipe_ids.update([self._trans_to_recipe_id_from_str(l.strip()) for l in fp.readlines() if len(l.strip())])
         
         recipes_num = len(recipes)
         for i, recipe in enumerate(recipes.values()):
             if self._is_existed_recipe(recipe):
-                logger.debug("{}:({:05d}/{:05d}) skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                logger.debug("{} ({:05d}/{:05d}): skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 continue
     
             time.sleep(1)
             res = requests.get(recipe.detail_url, verify=False)
             if res.ok:
-                logger.info("{}:({:05d}/{:05d}) get: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                logger.info("{} ({:05d}/{:05d}): get : {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
-
         # get detail recipe info
         for target_fn in sorted(self.cache_dir.glob("[!_*]*"), key=lambda k: self._sortkey_cache_filename(k)):
             if not self._is_valid_cache_filename(target_fn):
-                logger.debug("skip file : {}".format(target_fn.name))
+                logger.debug("{}: skip file : {}".format(self.__class__.site_name, target_fn.name))
                 continue
             
             recipe_id = self._get_recipe_id_from_cache_file(target_fn)
             if recipe_id in processed_recipe_ids:
-                logger.debug("skip : {}".format(recipe_id))
+                logger.debug("{}: skip : {}".format(self.__class__.site_name, recipe_id))
                 continue
             
             try:
-                logger.info("start : {}".format(recipe_id))
+                logger.info("{}: start : {}".format(self.__class__.site_name, recipe_id))
                 content = target_fn.open("rb").read()
                 soup = BeautifulSoup(content, "html5lib", from_encoding=chardet.detect(content)["encoding"])
                 for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
@@ -223,9 +227,9 @@ class RecipeCrawlerTemplate(object):
                 
             except AttributeError:
                 logger.exception("not expected format.")
-                logger.info("remove : {:d}".format(recipe_id))
+                logger.info("{}: remove : {:d}".format(self.__class__.site_name, recipe_id))
                 new_target_fn = self._get_new_fn(target_fn, "_", 1)
-                logger.info("rename : {} -> {}".format(target_fn.name, new_target_fn.name))
+                logger.info("{}: rename : {} -> {}".format(self.__class__.site_name, target_fn.name, new_target_fn.name))
                 target_fn.rename(new_target_fn)
     
     def _is_existed_recipe(self, recipe):
@@ -238,6 +242,9 @@ class RecipeCrawlerTemplate(object):
         if to_path.exists():
             return self._get_new_fn(from_path, prefix_mark, prefix_times + 1)
         return to_path
+
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return int(target_id_str)
 
     def _sortkey_cache_filename(self, target_fn):
         return int(str(target_fn.stem))
@@ -448,6 +455,9 @@ class OshaberiRecipeCrawler(RecipeCrawlerTemplate):
 
 class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
     site_name = "three_minutes_cooking"
+
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return target_id_str
 
     def _sortkey_cache_filename(self, target_fn):
         return target_fn.stem
