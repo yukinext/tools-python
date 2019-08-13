@@ -632,7 +632,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         """
         recipe = copy.deepcopy(overview_recipe)
 
-        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("p", "plat").img["src"]))
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, "".join(detail_soup.find("p", "plat").img["src"].split()))) # No.135 is invalid: 'https://www.nhk.or.jp/kamado/images/135\n\n/recipe_plat.jpg'
 
         material_title_node = detail_soup.find("div", "sozai_inner").table
         for material in material_title_node.find_all("tr"):
@@ -688,6 +688,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
                     text += td.text.strip()
                 
                 if len(text):
+                    image_urls = ["".join(image_url.split()) for image_url in image_urls] # No.120 is invalid "../images/120\n/recipe_process03.jpg"
                     recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
             
         yield recipe
