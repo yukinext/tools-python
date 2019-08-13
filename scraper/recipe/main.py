@@ -686,19 +686,9 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
 
                 if len(td.text.strip()):
                     text += td.text.strip()
-
-                recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
-            """
-            if recipe_step.img:
-                img_alt = recipe_step.img["alt"]
-                if -1 < img_alt.find("step"):
-                    num = int(img_alt.replace("step", ""))
-                    recipe.recipe_steps.append(RecipeText("（{}）{}".format(num, recipe_step.text.strip()), image_urls=image_urls))
-                else:
-                    recipe.recipe_steps.append(RecipeText(img_alt.strip(), image_urls=image_urls))
-            else:
-                recipe.recipe_steps.append(RecipeText(recipe_step.text.strip(), image_urls=image_urls))
-            """
+                
+                if len(text):
+                    recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
             
         yield recipe
 
