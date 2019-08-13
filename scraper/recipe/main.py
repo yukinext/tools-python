@@ -65,7 +65,9 @@ class EvernoteTransrator(object):
 <en-note>
 {%- autoescape true %}
 <h1><a href="{{ recipe.detail_url }}">{{ recipe.cooking_name }}</a></h1>
-
+{%- if recipe.cooking_name_sub %}
+{{ recipe.cooking_name_sub }}<br />
+{%- endif %}
 {%- for image_url in recipe.image_urls %}
 <en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" /><br />
 {%- endfor %}
@@ -181,6 +183,7 @@ class Recipe(object):
         self.detail_url = None
         self.image_urls = list() # original image sourece urls
         self.cooking_name = None # 料理名
+        self.cooking_name_sub = None
         self.program_name = None # 番組名
         self.program_date = datetime.date.today() # 番組日付
         self.materials = list() # 材料. value: RecipeText
@@ -603,7 +606,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         return target_id_str
 
     def _sortkey_cache_filename(self, target_fn):
-        return target_fn.stem
+        return int(re.search(r"(\d+)", target_fn.stem).group(0))
 
     def _is_valid_cache_filename(self, target_fn):
         return not target_fn.stem.startswith("_")
@@ -618,8 +621,8 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
             recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).groups()[0]
             
-            program_date_str, _, cooking_name, _ = item.find_all("p")
-            recipe.cooking_name = cooking_name.text
+            program_date_str, _, cooking_name_sub, _ = item.find_all("p")
+            recipe.cooking_name_sub = "〜{}〜より".format(cooking_name_sub.text)
             recipe.program_name = self.program_name
             recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str.text).groups()])
             recipes[recipe.id] = recipe
@@ -632,6 +635,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         """
         recipe = copy.deepcopy(overview_recipe)
 
+        recipe.cooking_name = detail_soup.h2.text
         recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, "".join(detail_soup.find("p", "plat").img["src"].split()))) # No.135 is invalid: 'https://www.nhk.or.jp/kamado/images/135\n\n/recipe_plat.jpg'
 
         material_title_node = detail_soup.find("div", "sozai_inner").table
