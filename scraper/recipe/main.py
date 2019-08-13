@@ -66,30 +66,44 @@ class EvernoteTransrator(object):
 {%- autoescape true %}
 <h1><a href="{{ recipe.detail_url }}">{{ recipe.cooking_name }}</a></h1>
 
-{%- for image_resource in image_resources %}
-<en-media type="{{ image_resources.mime }}" hash="{{ image_resource.data.bodyHash }}" /><br />
+{%- for image_url in recipe.image_urls %}
+<en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" /><br />
 {%- endfor %}
 
 <h2>材料</h2>
 <ul>
 {%- for material in recipe.materials %}
     <li>
-        <div>{{ material }}</div>
-    </li>
-{%- endfor %}
-</ul>
-<h2>作り方</h2>
-<ul>
-{%- for recipe_step in recipe.recipe_steps %}
-    <li>
-        <div>{{ recipe_step }}</div>
+        <div>{{ material.text }}</div>
+{%- for image_url in material.image_urls %}
+        <br /><en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" />
+{%- endfor %}        
+{%- for important_point in material.important_points %}
+        <br /><strong>{{ important_point }}</strong>
+{%- endfor %}        
     </li>
 {%- endfor %}
 </ul>
 
+<h2>作り方</h2>
 {%- for important_point in recipe.important_points %}
-<strong>{{ important_point }}</strong><br/>
+<strong>{{ important_point.text }}</strong><br/>
 {%- endfor %}
+
+<ul>
+{%- for recipe_step in recipe.recipe_steps %}
+    <li>
+        <div>{{ recipe_step.text }}</div>
+{%- for image_url in recipe_step.image_urls %}
+        <br /><en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" />
+{%- endfor %}        
+{%- for important_point in recipe_step.important_points %}
+        <br /><strong>{{ important_point }}</strong>
+{%- endfor %}        
+    </li>
+{%- endfor %}
+</ul>
+
 {%- endautoescape %}
 </en-note>
 """
@@ -105,12 +119,16 @@ class EvernoteTransrator(object):
 
     @property
     def body_resources(self):
-        image_resources = []
+        image_resources = dict() # key: image_url, value: resource
         
-        for image_url in self.recipe.image_urls:
-            resource = EvernoteTransrator._get_create_evernote_resource(image_url)
-            if resource:
-                image_resources.append(resource)
+        image_resources.update(self.__class__._get_create_evernote_resource_dict(self.recipe.image_urls))
+
+        for material in self.recipe.materials:
+            image_resources.update(self.__class__._get_create_evernote_resource_dict(material.image_urls))
+        
+        for recipe_step in self.recipe.recipe_steps:
+            image_resources.update(self.__class__._get_create_evernote_resource_dict(recipe_step.image_urls))
+        
         return image_resources, jinja2.Template(EvernoteTransrator._template).render(recipe=self.recipe, image_resources=image_resources)
     
     @property
@@ -120,6 +138,16 @@ class EvernoteTransrator(object):
         ret.add("{:%Y.%m.%d}".format(self.recipe.program_date))
         if self.site_config.get("tag_names"):
             ret.update(self.site_config["tag_names"])
+        return ret
+
+    @staticmethod
+    def _get_create_evernote_resource_dict(source_urls):
+        ret = dict()
+        for source_url in source_urls:
+            resource = EvernoteTransrator._get_create_evernote_resource(source_url)
+            if resource:
+                ret[source_url] = resource
+        
         return ret
 
     @staticmethod
@@ -155,9 +183,15 @@ class Recipe(object):
         self.cooking_name = None # 料理名
         self.program_name = None # 番組名
         self.program_date = datetime.date.today() # 番組日付
-        self.materials = list() # 材料
-        self.recipe_steps = list() # 作り方
-        self.important_points = list()
+        self.materials = list() # 材料. value: RecipeText
+        self.recipe_steps = list() # 作り方: RecipeText
+        self.important_points = list() # RecipeText
+
+class RecipeText(object):
+    def __init__(self, text, image_urls=None, important_points=None):
+        self.text = text
+        self.image_urls = image_urls if image_urls else []
+        self.important_points = important_points if important_points else []
 
 class RecipeCrawlerTemplate(object):
     site_name = ""
@@ -227,7 +261,7 @@ class RecipeCrawlerTemplate(object):
                 
             except AttributeError:
                 logger.exception("not expected format.")
-                logger.info("{}: remove : {:d}".format(self.__class__.site_name, recipe_id))
+                logger.info("{}: remove : {}".format(self.__class__.site_name, recipe_id))
                 new_target_fn = self._get_new_fn(target_fn, "_", 1)
                 logger.info("{}: rename : {} -> {}".format(self.__class__.site_name, target_fn.name, new_target_fn.name))
                 target_fn.rename(new_target_fn)
@@ -297,8 +331,8 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
             material_title_node = cooking_name_node.parent.find(text="材料")
             recipe_steps_title_node = cooking_name_node.parent.find(text="作り方")
 
-            recipe.materials = [material[1:] if material.startswith("・") else material for material in material_title_node.parent.find_next_sibling().text.splitlines() if len(material.strip())]
-            recipe.recipe_steps = [recipe_step for recipe_step in recipe_steps_title_node.parent.find_next_sibling().text.splitlines() if len(recipe_step.strip())]
+            recipe.materials = [RecipeText(material[1:]) if material.startswith("・") else RecipeText(material) for material in material_title_node.parent.find_next_sibling().text.splitlines() if len(material.strip())]
+            recipe.recipe_steps = [RecipeText(recipe_step) for recipe_step in recipe_steps_title_node.parent.find_next_sibling().text.splitlines() if len(recipe_step.strip())]
             
             if len(recipe.materials) == 0:
                 m_buf = list()
@@ -312,10 +346,10 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
                                     m_buf.append(m[1:])
                                 else:
                                     m_buf.append(m)
-                recipe.materials = m_buf
+                recipe.materials = [RecipeText(m) for m in m_buf]
             
             if len(recipe.recipe_steps) == 0:
-                recipe.recipe_steps = [recipe_step.strip() for recipe_step in recipe_steps_title_node.parent.next_siblings if isinstance(recipe_step, bs4.NavigableString) and len(recipe_step.strip())]
+                recipe.recipe_steps = [RecipeText(recipe_step.strip()) for recipe_step in recipe_steps_title_node.parent.next_siblings if isinstance(recipe_step, bs4.NavigableString) and len(recipe_step.strip())]
             
             if len(recipe.recipe_steps) == 0:
                 r_buf = list()
@@ -329,7 +363,7 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
                             for r in r_.splitlines():
                                 if len(r):
                                     r_buf.append(r)
-                recipe.recipe_steps = r_buf
+                recipe.recipe_steps = [RecipeText(r) for r in r_buf]
             
             yield recipe
 
@@ -361,12 +395,12 @@ class DanshigohanRecipeCrawler(RecipeCrawlerTemplate):
         material_title_node, recipe_steps_title_node = detail_soup.find_all("h6")
         material_title = material_title_node.text.replace("材料", "").strip()
         if material_title:
-            recipe.materials.append(material_title)
+            recipe.materials.append(RecipeText(material_title))
         for material in material_title_node.find_next_sibling("ul").find_all("li"):
-            recipe.materials.append(": ".join([m.text for m in material.find_all("span")]))
+            recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("span")])))
 
         for recipe_step in recipe_steps_title_node.find_next_sibling("ul").find_all("li"):
-            recipe.recipe_steps.append(recipe_step.text.strip())
+            recipe.recipe_steps.append(RecipeText(recipe_step.text.strip()))
         
         yield recipe
 
@@ -398,13 +432,13 @@ class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
 
         material_title = "（{}）".format(detail_soup.find("td", align="right").b.text.strip())
         if material_title:
-            recipe.materials.append(material_title)
+            recipe.materials.append(RecipeText(material_title))
         
         for material in detail_soup.find("div","zairyo").text.strip().splitlines():
             if -1 < material.find("監修"):
                 break
             if len(material):
-                recipe.materials.append(material.replace("…", ": "))
+                recipe.materials.append(RecipeText(material.replace("…", ": ")))
 
         for recipe_step in detail_soup.find_all("table")[-2].find_all("td")[1].text.strip().splitlines():
             recipe_step = recipe_step.strip()
@@ -412,7 +446,7 @@ class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
                 break
 
             if len(recipe_step):
-                recipe.recipe_steps.append(recipe_step)
+                recipe.recipe_steps.append(RecipeText(recipe_step))
         
         yield recipe
 
@@ -445,10 +479,10 @@ class OshaberiRecipeCrawler(RecipeCrawlerTemplate):
         recipe_steps_title_node, material_title_node = detail_soup.find_all("table", "text2")
         material_title = "（{}）".format(detail_soup.find("td", "making").text)
         if material_title:
-            recipe.materials.append(material_title)
-        recipe.materials.extend([tr.text.strip().replace("\n", ": ") for tr in material_title_node.find_all("tr")])
+            recipe.materials.append(RecipeText(material_title))
+        recipe.materials.extend([RecipeText(tr.text.strip().replace("\n", ": ")) for tr in material_title_node.find_all("tr")])
 
-        recipe.recipe_steps = ["（{}）{}".format(i+1, tr.text.strip()) for i, tr in enumerate(recipe_steps_title_node.find_all("tr"))]
+        recipe.recipe_steps = [RecipeText("（{}）{}".format(i+1, tr.text.strip())) for i, tr in enumerate(recipe_steps_title_node.find_all("tr"))]
         
         yield recipe
 
@@ -508,9 +542,9 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
         
         material_title = material_title_node.h4.text.replace("材料", "").replace("(", "（").replace(")", "）").strip()
         if material_title:
-            recipe.materials.append(material_title)
+            recipe.materials.append(RecipeText(material_title))
         for material in material_title_node.find_all("tr"):
-            recipe.materials.append(": ".join([m.text for m in material.find_all("td")]))
+            recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("td")])))
 
         for recipe_step in recipe_steps_title_node.find_all("tr"):
             num, step = recipe_step.find_all("td")
@@ -518,7 +552,7 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
             if len(num.text.strip()):
                 buf += "（{}）".format(num.text.strip())
             buf += step.text.strip()
-            recipe.recipe_steps.append(buf)
+            recipe.recipe_steps.append(RecipeText(buf))
         
         yield recipe
 
@@ -551,15 +585,121 @@ class OishimeshiRecipeCrawler(RecipeCrawlerTemplate):
         recipe_steps_title_node = detail_soup.find("table", "recipe")
         material_title = material_title_node.p.text.replace("材料", "").replace("（", "（").replace(")", "）").strip()
         if material_title:
-            recipe.materials.append(material_title)
-        recipe.materials.extend([": ".join([mm.text for mm in m.find_all("td") if len(mm.text.strip())]) for m in material_title_node.find_all("tr")])
+            recipe.materials.append(RecipeText(material_title))
+        recipe.materials.extend([RecipeText(": ".join([mm.text for mm in m.find_all("td") if len(mm.text.strip())])) for m in material_title_node.find_all("tr")])
 
         for recipe_step in recipe_steps_title_node.find_all("tr"):
             num, text, point = recipe_step.find_all("td")
             recipe.recipe_steps.append("（{}）{}".format(num.text.strip(), text.text.strip()))
             if len(point.text.strip()):
-                recipe.recipe_steps.append(point.text.strip())
+                recipe.recipe_steps.append(RecipeText(point.text.strip()))
         
+        yield recipe
+
+class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "nhk_kamado"
+
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return target_id_str
+
+    def _sortkey_cache_filename(self, target_fn):
+        return target_fn.stem
+
+    def _is_valid_cache_filename(self, target_fn):
+        return not target_fn.stem.startswith("_")
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return target_fn.stem
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in overview_soup.find("ul", "recipeTable").find_all("li"):
+            recipe = Recipe()
+            recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
+            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).groups()[0]
+            
+            program_date_str, _, cooking_name, _ = item.find_all("p")
+            recipe.cooking_name = cooking_name.text
+            recipe.program_name = self.program_name
+            recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str.text).groups()])
+            recipes[recipe.id] = recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("p", "plat").img["src"]))
+
+        material_title_node = detail_soup.find("div", "sozai_inner").table
+        for material in material_title_node.find_all("tr"):
+            recipe.materials.append(RecipeText(": ".join(material.text.strip().split())))
+
+        kimete = detail_soup.find("div", "kimete")
+        if kimete:
+            if kimete.h4:
+                recipe.important_points.append(RecipeText(kimete.h4.text))
+            kimete_l = kimete.select_one("div.kimete_l,div.kimete_inner2")
+            if kimete_l:
+                for p in kimete_l.find_all("p"):
+                    recipe.important_points.append(RecipeText(": ".join([c.text if hasattr(c, "text") else c for c in p.contents])))
+        recipe_prepare_node = detail_soup.find("table", "prepare")
+        if recipe_prepare_node:
+            recipe.recipe_steps.append(RecipeText("準備"))
+            recipe_prepare_l = recipe_prepare_node.find("p", "txt")
+            if recipe_prepare_l is None:
+                ps = recipe_prepare_node.find_all("p")
+                if ps:
+                    recipe_prepare_l = ps[-1]
+                else:
+                    recipe_prepare_l = detail_soup.dl # example: id=04
+            if recipe_prepare_l:
+                for c in recipe_prepare_l.contents:
+                    tmp = c
+                    if hasattr(c, "text"):
+                        tmp = c.text
+                    tmp = tmp.strip()
+                    if len(tmp):
+                        recipe.recipe_steps.append(RecipeText(tmp))
+            else:
+                logger.debug("no prepare: {}".format(recipe.id))
+                
+        recipe_steps_title_node = detail_soup.find("table", "step")
+        for recipe_step in recipe_steps_title_node.tbody.find_all("tr", recursive=False):
+            for td in recipe_step.find_all("td", recursive=False):
+                image_urls = [urllib.parse.urljoin(recipe.detail_url, img["src"]) for img in td.select('img[src$="jpg"]')]
+                
+                text = ""
+                if td.img:
+                    # img_alt = td.img["alt"] # 02 is invalid step number.
+                    img_src = td.img["src"]
+                    m = re.search(r".*step(\d+)\.png", img_src)
+                    if m:
+                        num = m.groups()[0]
+                        num = int(num)
+                        text += "（{}）".format(num)
+                    else:
+                        text += td.img["alt"]
+
+                if len(td.text.strip()):
+                    text += td.text.strip()
+
+                recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
+            """
+            if recipe_step.img:
+                img_alt = recipe_step.img["alt"]
+                if -1 < img_alt.find("step"):
+                    num = int(img_alt.replace("step", ""))
+                    recipe.recipe_steps.append(RecipeText("（{}）{}".format(num, recipe_step.text.strip()), image_urls=image_urls))
+                else:
+                    recipe.recipe_steps.append(RecipeText(img_alt.strip(), image_urls=image_urls))
+            else:
+                recipe.recipe_steps.append(RecipeText(recipe_step.text.strip(), image_urls=image_urls))
+            """
+            
         yield recipe
 
 
@@ -602,7 +742,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
         if not is_note_exist:
             logger.info("create note: {}".format(note_title))
             resources, body = trans.body_resources
-            note = Types.Note(title=note_title, content=body, resources=resources, notebookGuid=target_notebook.guid)
+            note = Types.Note(title=note_title, content=body, resources=resources.values(), notebookGuid=target_notebook.guid)
             note.tagNames = trans.tag_names
             note_store.createNote(note)
             
@@ -661,6 +801,7 @@ def main():
             OshaberiRecipeCrawler(),
             ThreeMinCookingRecipeCrawler(),
             OishimeshiRecipeCrawler(),
+            NhkKamadoRecipeCrawler(),
             ]])
 
     config = yaml.load(args.config_yaml_filename.open("r").read())

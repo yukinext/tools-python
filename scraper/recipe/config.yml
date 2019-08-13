@@ -34,3 +34,8 @@ oishimeshi:
     program_name: "CSネット コープのおいしめし"
     entry_urls:
         - "https://www.csnet.coop/movies/recipemovie.cgi?template=index.html"
+nhk_kamado:
+    enable: true
+    program_name: "NHK グレーテルのかまど"
+    entry_urls:
+        - "https://www.nhk.or.jp/kamado/recipe.html"
