@@ -72,6 +72,7 @@ class EvernoteTransrator(object):
 <en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" /><br />
 {%- endfor %}
 
+{%- if 0 < recipe.materials|length %}
 <h2>材料</h2>
 <ul>
 {%- for material in recipe.materials %}
@@ -86,7 +87,9 @@ class EvernoteTransrator(object):
     </li>
 {%- endfor %}
 </ul>
+{%- endif %}
 
+{%- if 0 < recipe.recipe_steps|length %}
 <h2>作り方</h2>
 {%- for important_point in recipe.important_points %}
 <strong>{{ important_point.text }}</strong><br/>
@@ -105,6 +108,7 @@ class EvernoteTransrator(object):
     </li>
 {%- endfor %}
 </ul>
+{%- endif %}
 
 {%- endautoescape %}
 </en-note>
@@ -316,7 +320,7 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
             
             m = re.match(r".*?(\d{6}).*", pathlib.Path(link.img["src"]).name)
             if m:
-                yymmdd = m.groups()[0]
+                yymmdd = m.group(1)
                 logger.debug("program_date:{}".format(yymmdd))
                 # recipe.program_date = datetime.date(year=2000 + int(yymmdd[0:2]), month=int(yymmdd[2:4]), day=int(yymmdd[4:6]))
                 recipe.program_date = dateutil.parser.parse("20{}".format(yymmdd))
@@ -379,7 +383,7 @@ class DanshigohanRecipeCrawler(RecipeCrawlerTemplate):
         for item in overview_soup.find_all("div", "item"):
             recipe = Recipe()
             recipe.detail_url = item.a["href"]
-            recipe.id = int(re.search(r"_(\d+)\.html", recipe.detail_url).groups()[0])
+            recipe.id = int(re.search(r"_(\d+)\.html", recipe.detail_url).group(1))
             recipe.cooking_name = item.h4.text
             recipe.program_name = self.program_name
             recipe.program_date = dateutil.parser.parse(item.find("div", "date").text)
@@ -416,7 +420,7 @@ class RskCookingRecipeRecipeCrawler(RecipeCrawlerTemplate):
         for item in overview_soup.find_all("div", "recipe-piece"):
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
-            program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).groups()[0]
+            program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).group(1)
             recipe.id = int(program_date_str)
             recipe.program_name = self.program_name
             recipe.program_date = dateutil.parser.parse(program_date_str)
@@ -462,7 +466,7 @@ class OshaberiRecipeCrawler(RecipeCrawlerTemplate):
             for link in item.find_all("a"):
                 recipe = Recipe()
                 recipe.detail_url = urllib.parse.urljoin(entry_url, link["href"])
-                program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).groups()[0]
+                program_date_str = re.search(r"/(\d+)\.html", recipe.detail_url).group(1)
                 recipe.id = int(program_date_str)
                 recipe.cooking_name = link.text.split()[-1]
                 recipe.program_name = self.program_name
@@ -514,14 +518,14 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
                 if other_recipe_node:
                     other_recipe = Recipe()
                     other_recipe.detail_url = urllib.parse.urljoin(detail_url, other_recipe_node.a["href"])
-                    other_recipe.id = re.search(r".*/(.*)\.html", other_recipe.detail_url).groups()[0]
+                    other_recipe.id = re.search(r".*/(.*)\.html", other_recipe.detail_url).group(1)
                     return other_recipe
         
         recipes = dict() # key: Recipe.id, value: Recipe
         for item in [item for item in overview_soup.find_all("div", "waku") if item.a]:
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
-            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).groups()[0]
+            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).group(1)
             recipe.image_urls.append(item.img["src"])
             recipes[recipe.id] = recipe
 
@@ -569,7 +573,7 @@ class OishimeshiRecipeCrawler(RecipeCrawlerTemplate):
             recipe = Recipe()
             tmp = item.find("p", "title")
             recipe.detail_url = tmp.a["href"]
-            program_date_str = re.search(r"date=(\d+)\D?", recipe.detail_url).groups()[0]
+            program_date_str = re.search(r"date=(\d+)\D?", recipe.detail_url).group(1)
             recipe.id = int(program_date_str)
             recipe.cooking_name = tmp.text
             recipe.program_name = self.program_name
@@ -606,7 +610,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         return target_id_str
 
     def _sortkey_cache_filename(self, target_fn):
-        return int(re.search(r"(\d+)", target_fn.stem).group(0))
+        return int(re.search(r"(\d+)", target_fn.stem).group(1))
 
     def _is_valid_cache_filename(self, target_fn):
         return not target_fn.stem.startswith("_")
@@ -619,7 +623,7 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         for item in overview_soup.find("ul", "recipeTable").find_all("li"):
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
-            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).groups()[0]
+            recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).group(1)
             
             program_date_str, _, cooking_name_sub, _ = item.find_all("p")
             recipe.cooking_name_sub = "〜{}〜より".format(cooking_name_sub.text)
@@ -635,66 +639,120 @@ class NhkKamadoRecipeCrawler(RecipeCrawlerTemplate):
         """
         recipe = copy.deepcopy(overview_recipe)
 
-        recipe.cooking_name = detail_soup.h2.text
+        recipe.cooking_name = "".join(detail_soup.h2.text.split()) # No.153 is invalid title ex. "(太陽みたいなでっか～い)\tアンパン"
         recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, "".join(detail_soup.find("p", "plat").img["src"].split()))) # No.135 is invalid: 'https://www.nhk.or.jp/kamado/images/135\n\n/recipe_plat.jpg'
 
-        material_title_node = detail_soup.find("div", "sozai_inner").table
-        for material in material_title_node.find_all("tr"):
-            recipe.materials.append(RecipeText(": ".join(material.text.strip().split())))
-
-        kimete = detail_soup.find("div", "kimete")
-        if kimete:
-            if kimete.h4:
-                recipe.important_points.append(RecipeText(kimete.h4.text))
-            kimete_l = kimete.select_one("div.kimete_l,div.kimete_inner2")
-            if kimete_l:
-                for p in kimete_l.find_all("p"):
-                    recipe.important_points.append(RecipeText(": ".join([c.text if hasattr(c, "text") else c for c in p.contents])))
-        recipe_prepare_node = detail_soup.find("table", "prepare")
-        if recipe_prepare_node:
-            recipe.recipe_steps.append(RecipeText("準備"))
-            recipe_prepare_l = recipe_prepare_node.find("p", "txt")
-            if recipe_prepare_l is None:
-                ps = recipe_prepare_node.find_all("p")
-                if ps:
-                    recipe_prepare_l = ps[-1]
-                else:
-                    recipe_prepare_l = detail_soup.dl # example: id=04
-            if recipe_prepare_l:
-                for c in recipe_prepare_l.contents:
-                    tmp = c
-                    if hasattr(c, "text"):
-                        tmp = c.text
-                    tmp = tmp.strip()
-                    if len(tmp):
-                        recipe.recipe_steps.append(RecipeText(tmp))
-            else:
-                logger.debug("no prepare: {}".format(recipe.id))
-                
-        recipe_steps_title_node = detail_soup.find("table", "step")
-        for recipe_step in recipe_steps_title_node.tbody.find_all("tr", recursive=False):
-            for td in recipe_step.find_all("td", recursive=False):
-                image_urls = [urllib.parse.urljoin(recipe.detail_url, img["src"]) for img in td.select('img[src$="jpg"]')]
-                
-                text = ""
-                if td.img:
-                    # img_alt = td.img["alt"] # 02 is invalid step number.
-                    img_src = td.img["src"]
-                    m = re.search(r".*step(\d+)\.png", img_src)
-                    if m:
-                        num = m.groups()[0]
-                        num = int(num)
-                        text += "（{}）".format(num)
+        if detail_soup.find("div", "sozai_inner"):
+            # exist materials part
+            material_title_node = detail_soup.find("div", "sozai_inner").table
+            for material in material_title_node.find_all("tr"):
+                recipe.materials.append(RecipeText(": ".join(material.text.strip().split())))
+    
+            kimete = detail_soup.find("div", "kimete")
+            if kimete:
+                if kimete.h4:
+                    recipe.important_points.append(RecipeText(kimete.h4.text))
+                kimete_l = kimete.select_one("div.kimete_l,div.kimete_inner2")
+                if kimete_l:
+                    for p in kimete_l.find_all("p"):
+                        recipe.important_points.append(RecipeText(": ".join([c.text if hasattr(c, "text") else c for c in p.contents])))
+            recipe_prepare_node = detail_soup.find("table", "prepare")
+            if recipe_prepare_node:
+                recipe.recipe_steps.append(RecipeText("準備"))
+                recipe_prepare_l = recipe_prepare_node.find("p", "txt")
+                if recipe_prepare_l is None:
+                    ps = recipe_prepare_node.find_all("p")
+                    if ps:
+                        recipe_prepare_l = ps[-1]
                     else:
-                        text += td.img["alt"]
-
-                if len(td.text.strip()):
-                    text += td.text.strip()
+                        recipe_prepare_l = detail_soup.dl # example: id=04
+                if recipe_prepare_l:
+                    for c in recipe_prepare_l.contents:
+                        tmp = c
+                        if hasattr(c, "text"):
+                            tmp = c.text
+                        tmp = tmp.strip()
+                        if len(tmp):
+                            recipe.recipe_steps.append(RecipeText(tmp))
+                else:
+                    logger.debug("no prepare: {}".format(recipe.id))
+        
+        for step_table in detail_soup.find_all("table", "step"): # No.92 has multiple table(include invalid format)
+            # exist recipe steps part
+            recipe_steps_title_node = step_table
+            if recipe_steps_title_node.tbody:
+                recipe_steps_title_node = recipe_steps_title_node.tbody # No.92 has no tbody element
                 
-                if len(text):
-                    image_urls = ["".join(image_url.split()) for image_url in image_urls] # No.120 is invalid "../images/120\n/recipe_process03.jpg"
-                    recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
+            for recipe_step in recipe_steps_title_node.find_all("tr", recursive=False):
+                for td in recipe_step.find_all("td", recursive=False):
+                    image_urls = [urllib.parse.urljoin(recipe.detail_url, img["src"]) for img in td.select('img[src$="jpg"]')]
+                    
+                    text = ""
+                    if td.img:
+                        # img_alt = td.img["alt"] # 02 is invalid step number.
+                        img_src = td.img["src"]
+                        m = re.search(r".*step(\d+)\.png", img_src)
+                        if m:
+                            num = m.group(1)
+                            num = int(num)
+                            text += "（{}）".format(num)
+                        else:
+                            text += td.img["alt"]
+    
+                    if len(td.text.strip()):
+                        text += td.text.strip()
+                    
+                    if len(text):
+                        image_urls = ["".join(image_url.split()) for image_url in image_urls] # No.120 is invalid "../images/120\n/recipe_process03.jpg"
+                        recipe.recipe_steps.append(RecipeText(text, image_urls=image_urls))
             
+        yield recipe
+
+
+class NikomaruKitchenRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "nikomaru"
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        for item in overview_soup.find_all("dl"):
+            recipe = Recipe()
+            name, date, _ = item.find_all("dd")
+            recipe.detail_url = urllib.parse.urljoin(entry_url, name.a["href"])
+            recipe.id = int(re.search(r".*/(\d+)$", recipe.detail_url).group(1))
+            recipe.cooking_name = name.text
+            recipe.program_name = self.program_name
+            recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", date.text).groups()])
+            recipes[recipe.id] = recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("div", "photo").img["src"]))
+
+        material_title_node = detail_soup.find("div", "material")
+        material_title = material_title_node.h4.text.replace("材料", "").strip()
+        if material_title:
+            recipe.materials.append(RecipeText("（{}）".format(material_title)))
+        for material in material_title_node.find_all("li"):
+            texts = [m.text for m in material.find_all("span")]
+            if "".join([t.strip() for t in texts]) == "":
+                continue
+            recipe.materials.append(RecipeText(": ".join(texts)))
+
+        recipe_steps_title_node = detail_soup.find("div", "make")
+
+        for i, recipe_step in enumerate(recipe_steps_title_node.find_all("li")):
+            for j, l in enumerate(recipe_step.text.splitlines()):
+                if j == 0:
+                    recipe.recipe_steps.append(RecipeText("（{}）{}".format(i + 1, l)))
+                    continue                
+                recipe.recipe_steps.append(RecipeText(l))
+        
         yield recipe
 
 
@@ -797,6 +855,7 @@ def main():
             ThreeMinCookingRecipeCrawler(),
             OishimeshiRecipeCrawler(),
             NhkKamadoRecipeCrawler(),
+            NikomaruKitchenRecipeCrawler(),
             ]])
 
     config = yaml.load(args.config_yaml_filename.open("r").read())

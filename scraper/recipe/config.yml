@@ -39,3 +39,8 @@ nhk_kamado:
     program_name: "NHK グレーテルのかまど"
     entry_urls:
         - "https://www.nhk.or.jp/kamado/recipe.html"
+nikomaru:
+    enable: true
+    program_name: "KSB にこまるキッチン"
+    entry_urls:
+        - "http://setonaikai.co.jp/250/paradise/list"
