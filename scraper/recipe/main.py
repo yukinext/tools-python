@@ -537,7 +537,6 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
             recipe.id = re.search(r".*/(.*)\.html", recipe.detail_url).group(1)
-            recipe.image_urls.append(item.img["src"])
             recipes[recipe.id] = recipe
 
             other_recipe = get_other_recipe(recipe.detail_url)
@@ -555,6 +554,8 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
         recipe.program_name = self.program_name
         recipe.program_date = dateutil.parser.parse(recipe.id.split("_")[0])
 
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.select_one("#thumbnail")["src"]))
+
         material_title_node = detail_soup.find("div", "ingredient")
         recipe_steps_title_node = detail_soup.find("div", "howto")
         
@@ -566,11 +567,26 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
 
         for recipe_step in recipe_steps_title_node.find_all("tr"):
             num, step = recipe_step.find_all("td")
-            buf = ""
-            if len(num.text.strip()):
-                buf += "（{}）".format(num.text.strip())
-            buf += step.text.strip()
-            recipe.recipe_steps.append(RecipeText(buf))
+            if step.li is None:
+                buf = ""
+                num = num.text.strip()
+                if len(num):
+                    buf += "（{}）".format(num)
+                buf += step.text.strip()
+                
+                image_urls = None
+                if step.img:
+                    image_urls = [urllib.parse.urljoin(recipe.detail_url, step.img["src"])]
+                
+                recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+            else:  # No.20190824
+                # exists sub steps.
+                recipe.recipe_steps.append(RecipeText(step.next)) # line.1 is title in sub steps
+                for sub_index, step_li in enumerate(step.find_all("li")):
+                    image_urls = None
+                    if step_li.img:
+                        image_urls = [urllib.parse.urljoin(recipe.detail_url, step_li.img["src"])]
+                    recipe.recipe_steps.append(RecipeText("（{}）{}".format(sub_index + 1, step_li.text), image_urls=image_urls))
         
         yield recipe
 
