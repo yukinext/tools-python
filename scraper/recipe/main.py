@@ -270,10 +270,15 @@ class RecipeCrawlerTemplate(object):
                 logger.debug("{}: skip : {}".format(self.__class__.site_name, recipe_id))
                 continue
             
+            if not recipe_id in recipes:
+                logger.warn("{}: not exists in overview. skip recipe id: {}".foramt(self.__class__.site_name, recipe_id))
+                continue
+            
             try:
                 logger.info("{}: start : {}".format(self.__class__.site_name, recipe_id))
                 content = target_fn.open("rb").read()
                 soup = BeautifulSoup(content, "html5lib", from_encoding=chardet.detect(content)["encoding"])
+                
                 for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
                     yield self.processed_list_filename, detail_recipe
                 
@@ -491,7 +496,8 @@ class OshaberiRecipeCrawler(RecipeCrawlerTemplate):
         must deepcopy "recipe" before use
         """
         recipe = copy.deepcopy(overview_recipe)
-
+        
+        recipe.cooking_name_sub = detail_soup.find("td", "tema").text if detail_soup.find("td", "tema") else None
         recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.select_one('img[src$="jpg"]')["src"]))
 
         recipe_steps_title_node, material_title_node = detail_soup.find_all("table", "text2")
@@ -587,6 +593,16 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
                     if step_li.img:
                         image_urls = [urllib.parse.urljoin(recipe.detail_url, step_li.img["src"])]
                     recipe.recipe_steps.append(RecipeText("（{}）{}".format(sub_index + 1, step_li.text), image_urls=image_urls))
+        
+        for appendix in detail_soup.find_all("div", "recipe-box"):
+            for i, l in enumerate([t.strip() for t in appendix.get_text("\n").splitlines() if len(t.strip())]):
+                if l.startswith("・"):
+                    l = l[1:].strip()
+                
+                if i:
+                    l = "　{}".format(l)
+                
+                recipe.important_points.append(RecipeText(l))
         
         yield recipe
 
