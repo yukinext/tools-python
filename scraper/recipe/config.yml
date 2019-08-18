@@ -50,7 +50,7 @@ nhk_kobara_ka:
     entry_urls:
         - "https://www4.nhk.or.jp/kobara/23/"
 nhk_kobara_ta:
-    enable: false
+    enable: true
     program_name: "NHK きじまりゅうたの小腹がすきました！"
     entry_urls:
         - "https://www4.nhk.or.jp/P4131/22/"
