@@ -26,6 +26,7 @@ import time
 import hashlib
 import mimetypes
 import dateutil.parser
+import pprint
 
 import jinja2
 from evernote.api.client import EvernoteClient
@@ -121,7 +122,10 @@ class EvernoteTransrator(object):
 
     @property
     def title(self):
-        return "{}「{}」 {:%Y.%m.%d}".format(self.recipe.program_name, self.recipe.cooking_name, self.recipe.program_date)
+        ret = "{}「{}」".format(self.recipe.program_name, self.recipe.cooking_name)
+        if self.recipe.program_date:
+            ret +=  " {:%Y.%m.%d}".format(self.recipe.program_date)
+        return ret
 
     @property
     def body_resources(self):
@@ -141,7 +145,8 @@ class EvernoteTransrator(object):
     def tag_names(self):
         ret = set(EvernoteTransrator.default_tag_names)
         ret.add(self.recipe.program_name)
-        ret.add("{:%Y.%m.%d}".format(self.recipe.program_date))
+        if self.recipe.program_date:
+            ret.add("{:%Y.%m.%d}".format(self.recipe.program_date))
         if self.site_config.get("tag_names"):
             ret.update(self.site_config["tag_names"])
         return ret
@@ -755,6 +760,68 @@ class NikomaruKitchenRecipeCrawler(RecipeCrawlerTemplate):
         
         yield recipe
 
+class NhkKobaraSuitemasenkaRecipeCrawler(RecipeCrawlerTemplate):
+    site_name = "nhk_kobara_ka"
+
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return target_id_str
+
+    def _sortkey_cache_filename(self, target_fn):
+        return target_fn.stem
+
+    def _is_valid_cache_filename(self, target_fn):
+        return not target_fn.stem.startswith("_")
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return target_fn.stem
+
+    def _get_recipe_overviews(self, overview_soup, entry_url):
+        recipes = dict() # key: Recipe.id, value: Recipe
+        items = iter(overview_soup.find_all("section")[1:-1])
+        for item in items:
+            subtitle_node = item
+            title_node = next(items)
+            recipe = Recipe()
+            recipe.detail_url = entry_url
+            recipe.cooking_name = title_node.h2.text.replace("「", "").replace("」", "").strip()
+            recipe.cooking_name_sub = subtitle_node.h2.text.strip()
+            recipe.program_name = self.program_name
+            recipe.program_date = None
+            recipe.image_urls.append(urllib.parse.urljoin(entry_url, title_node.img["src"]))
+            
+            is_material_area = False
+            is_recipe_step_area = False
+            for l in title_node.find("div", "option-media-row").get_text("\n").splitlines():
+                if len(l.strip()) == 0:
+                    continue
+                
+                if -1 < l.find("＜材料＞"):
+                    is_material_area = True
+                    recipe.materials.append(RecipeText(l.replace("＜材料＞", "").replace("(", "（").replace(")", "）")))
+                    continue
+                if -1 < l.find("＜作り方＞"):
+                    is_material_area = False
+                    is_recipe_step_area = True
+                    continue
+                
+                if is_material_area:
+                    recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
+                elif is_recipe_step_area:
+                    recipe.recipe_steps.append(RecipeText(l))
+                    
+            recipe.id = hashlib.md5("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name).encode("utf-8")).hexdigest()            
+            recipes[recipe.id] = recipe
+
+        return recipes
+    
+    def _recipe_details_generator(self, detail_soup, overview_recipe):
+        """
+        must deepcopy "recipe" before use
+        """
+        recipe = copy.deepcopy(overview_recipe)
+
+        yield recipe
+
 
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
@@ -834,6 +901,7 @@ def _get_evernote_credential(credential_json_filename):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("sites", nargs="*", help="site name in config yaml file. no input is select all sites")
+    parser.add_argument("--view", action="store_true")
     parser.add_argument("--config-yaml-filename", default=pathlib.Path(sys.argv[0]).parent / "config.yml", type=pathlib.Path)
     parser.add_argument("--work-dir", default=pathlib.Path(sys.argv[0]).parent / ".work_recipes", type=pathlib.Path, help="working directory")
     parser.add_argument("--credential-json-filename", default=pathlib.Path(sys.argv[0]).parent / "cred.json", type=pathlib.Path)
@@ -856,9 +924,26 @@ def main():
             OishimeshiRecipeCrawler(),
             NhkKamadoRecipeCrawler(),
             NikomaruKitchenRecipeCrawler(),
+            NhkKobaraSuitemasenkaRecipeCrawler(),
             ]])
 
     config = yaml.load(args.config_yaml_filename.open("r").read())
+    if args.view:
+        view_results = dict()
+        for site, site_config in config.items():
+            if len(args.sites):
+                for a_site in args.sites:
+                    if not a_site in view_results:
+                        view_results[a_site] = list()
+                    if -1 < site.find(a_site):
+                        view_results[a_site].append((site, site_config))
+            else:
+                if not "" in view_results:
+                    view_results[""] = list()
+                view_results[""].append((site, site_config))
+        pprint.pprint(view_results)
+        return
+    
     evernote_cred = _get_evernote_credential(args.credential_json_filename)
     if args.sites is None or len(args.sites) == 0:
         args.sites = [key for key in config.keys()]
