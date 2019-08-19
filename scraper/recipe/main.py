@@ -640,7 +640,7 @@ class OishimeshiRecipeCrawler(RecipeCrawlerTemplate):
 
         for recipe_step in recipe_steps_title_node.find_all("tr"):
             num, text, point = recipe_step.find_all("td")
-            recipe.recipe_steps.append("（{}）{}".format(num.text.strip(), text.text.strip()))
+            recipe.recipe_steps.append(RecipeText("（{}）{}".format(num.text.strip(), text.text.strip())))
             if len(point.text.strip()):
                 recipe.recipe_steps.append(RecipeText(point.text.strip()))
         
