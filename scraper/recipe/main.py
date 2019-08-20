@@ -27,6 +27,7 @@ import hashlib
 import mimetypes
 import dateutil.parser
 import pprint
+import pickle
 
 import jinja2
 from evernote.api.client import EvernoteClient
@@ -234,7 +235,7 @@ class RecipeCrawlerTemplate(object):
     def process(self):
         logger.info("{}: proc start".format(self.__class__.site_name))
         
-        recipes = dict() # key: Recipe.id. value: Recipe
+        recipes = dict() # key: Recipe.id, value: Recipe
 
         for entry_url in self.entry_urls:
             res = requests.get(entry_url, verify=False)
@@ -242,16 +243,12 @@ class RecipeCrawlerTemplate(object):
                 soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
                 recipes.update(self._get_recipe_overviews(soup, entry_url))
 
-        processed_recipe_ids = dict() # key: Recipe.id. value: detail_url
+        processed_recipe_ids = set()
             
         if self.processed_list_filename.exists():
             with self.processed_list_filename.open() as fp:
-                for l in fp.readlines():
-                    l = l.strip()
-                    if len(l):
-                        id_str, detail_url = l.split()
-                        processed_recipe_ids[self._trans_to_recipe_id_from_str(id_str)] = detail_url
-                    
+                processed_recipe_ids.update([self._trans_to_recipe_id_from_str(l.strip()) for l in fp.readlines() if len(l.strip())])
+        
         recipes_num = len(recipes)
         for i, recipe in enumerate(recipes.values()):
             if self._is_existed_recipe(recipe):
@@ -284,7 +281,7 @@ class RecipeCrawlerTemplate(object):
                 soup = BeautifulSoup(content, "html5lib", from_encoding=chardet.detect(content)["encoding"])
                 
                 for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
-                    yield self.processed_list_filename, detail_recipe
+                    yield detail_recipe
                 
             except AttributeError:
                 logger.exception("not expected format.")
@@ -358,41 +355,48 @@ class NhkUmaiRecipeCrawler(RecipeCrawlerTemplate):
             material_title_node = cooking_name_node.parent.find(text="材料")
             recipe_steps_title_node = cooking_name_node.parent.find(text="作り方")
 
-            recipe.materials = [RecipeText(material[1:]) if material.startswith("・") else RecipeText(material) for material in material_title_node.parent.find_next_sibling().text.splitlines() if len(material.strip())]
-            recipe.recipe_steps = [RecipeText(recipe_step) for recipe_step in recipe_steps_title_node.parent.find_next_sibling().text.splitlines() if len(recipe_step.strip())]
+            if material_title_node:
+                recipe.materials = [RecipeText(material[1:]) if material.startswith("・") else RecipeText(material) for material in material_title_node.parent.find_next_sibling().text.splitlines() if len(material.strip())]
             
-            if len(recipe.materials) == 0:
-                m_buf = list()
-                for material in material_title_node.parent.next_siblings:
-                    if material == recipe_steps_title_node.parent:
-                        break
-                    if isinstance(material, bs4.NavigableString):
-                        for m in material.replace("\u3000：", "：").replace("\u3000", "\n").strip().splitlines():
-                            if len(m):
-                                if m.startswith("・"):
-                                    m_buf.append(m[1:])
-                                else:
-                                    m_buf.append(m)
-                recipe.materials = [RecipeText(m) for m in m_buf]
+                if len(recipe.materials) == 0:
+                    m_buf = list()
+                    for material in material_title_node.parent.next_siblings:
+                        if material == recipe_steps_title_node.parent:
+                            break
+                        if isinstance(material, bs4.NavigableString):
+                            for m in material.replace("\u3000：", "：").replace("\u3000", "\n").strip().splitlines():
+                                if len(m):
+                                    if m.startswith("・"):
+                                        m_buf.append(m[1:])
+                                    else:
+                                        m_buf.append(m)
+                    recipe.materials = [RecipeText(m) for m in m_buf]
+            else:
+                recipe.materials = []
             
-            if len(recipe.recipe_steps) == 0:
-                recipe.recipe_steps = [RecipeText(recipe_step.strip()) for recipe_step in recipe_steps_title_node.parent.next_siblings if isinstance(recipe_step, bs4.NavigableString) and len(recipe_step.strip())]
+            if recipe_steps_title_node:
+                recipe.recipe_steps = [RecipeText(recipe_step) for recipe_step in recipe_steps_title_node.parent.find_next_sibling().text.splitlines() if len(recipe_step.strip())]
+                if len(recipe.recipe_steps) == 0:
+                    recipe.recipe_steps = [RecipeText(recipe_step.strip()) for recipe_step in recipe_steps_title_node.parent.next_siblings if isinstance(recipe_step, bs4.NavigableString) and len(recipe_step.strip())]
+                
+                if len(recipe.recipe_steps) == 0:
+                    r_buf = list()
+                    for recipe_step in recipe_steps_title_node.parent.next_siblings:
+                        if isinstance(recipe_step, bs4.NavigableString):
+                            if len(recipe_step.strip()):
+                                r_buf.append(recipe_step.strip())
+                        else:
+                            r_ = recipe_step.text.strip()
+                            if len(r_):
+                                for r in r_.splitlines():
+                                    if len(r):
+                                        r_buf.append(r)
+                    recipe.recipe_steps = [RecipeText(r) for r in r_buf]
+            else:
+                recipe.recipe_steps = []
             
-            if len(recipe.recipe_steps) == 0:
-                r_buf = list()
-                for recipe_step in recipe_steps_title_node.parent.next_siblings:
-                    if isinstance(recipe_step, bs4.NavigableString):
-                        if len(recipe_step.strip()):
-                            r_buf.append(recipe_step.strip())
-                    else:
-                        r_ = recipe_step.text.strip()
-                        if len(r_):
-                            for r in r_.splitlines():
-                                if len(r):
-                                    r_buf.append(r)
-                recipe.recipe_steps = [RecipeText(r) for r in r_buf]
-            
-            yield recipe
+            if len(recipe.materials) + len(recipe.recipe_steps):
+                yield recipe
 
 
 class DanshigohanRecipeCrawler(RecipeCrawlerTemplate):
@@ -985,7 +989,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
         target_notebook = note_store.createNotebook(target_notebook)
 
     # for processed_list_filename, recipe in recipes(args, site_config):
-    for processed_list_filename, recipe in recipes():
+    for recipe in recipes():
         trans = EvernoteTransrator(recipe, site_config)
         note_title = trans.title
 
@@ -1009,10 +1013,22 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
             note.tagNames = trans.tag_names
             note_store.createNote(note)
             
-            with processed_list_filename.open("a") as fp:
-                fp.write("{}\t{}\n".format(recipe.id, recipe.detail_url))
+            yield recipe
         
             time.sleep(1)
+
+def store_local(store_dirname, recipe):
+    pickle_filename = store_dirname / "{}.pickle".format(recipe.id)
+
+    recipe_list = []
+
+    if pickle_filename.exists():
+        recipe_list.extend(pickle.load(pickle_filename.open("rb")))
+
+    recipe_list.append(recipe)
+
+    with pickle_filename.open("wb") as fp:
+        pickle.dump(recipe_list, fp)
 
 def _get_evernote_credential(credential_json_filename):
     if not credential_json_filename.exists():
@@ -1098,7 +1114,13 @@ def main():
             if site_config["enable"]:
                 recipe_crawler = recipe_crawlers[site]
                 recipe_crawler.init(args, site_config)
-                store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note)
+                recipe_pickle_dir = (recipe_crawler.cache_dir / "_pickle").mkdir(parents=True, exist_ok=True)
+                for recipe in store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
+                    with recipe_crawler.processed_list_filename.open("a") as fp:
+                        fp.write("{}\n".format(recipe.id))
+                    
+                    store_local(recipe_pickle_dir, recipe)
+
             else:
                 logger.warning("disable: {}".format(site))
         else:
