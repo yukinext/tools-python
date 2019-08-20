@@ -1040,7 +1040,7 @@ def _get_evernote_credential(credential_json_filename):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("sites", nargs="*", help="site name in config yaml file. no input is select all sites")
-    parser.add_argument("--view", action="store_true")
+    parser.add_argument("--view-config", action="store_true")
     parser.add_argument("--config-yaml-filename", default=pathlib.Path(sys.argv[0]).parent / "config.yml", type=pathlib.Path)
     parser.add_argument("--work-dir", default=pathlib.Path(sys.argv[0]).parent / ".work_recipes", type=pathlib.Path, help="working directory")
     parser.add_argument("--credential-json-filename", default=pathlib.Path(sys.argv[0]).parent / "cred.json", type=pathlib.Path)
@@ -1068,7 +1068,7 @@ def main():
             ]])
 
     config = yaml.safe_load(args.config_yaml_filename.open("r").read())
-    if args.view:
+    if args.view_config:
         view_results = dict()
         for site, site_config in config.items():
             if len(args.sites):
