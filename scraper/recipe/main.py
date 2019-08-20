@@ -242,12 +242,16 @@ class RecipeCrawlerTemplate(object):
                 soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
                 recipes.update(self._get_recipe_overviews(soup, entry_url))
 
-        processed_recipe_ids = set()
+        processed_recipe_ids = dict() # key: id. value: detail_url
             
         if self.processed_list_filename.exists():
             with self.processed_list_filename.open() as fp:
-                processed_recipe_ids.update([self._trans_to_recipe_id_from_str(l.strip()) for l in fp.readlines() if len(l.strip())])
-        
+                for l in fp.readlines():
+                    l = l.strip()
+                    if len(l):
+                        id_str, detail_url = l.split()
+                        processed_recipe_ids[self._trans_to_recipe_id_from_str(id_str)] = detail_url
+                    
         recipes_num = len(recipes)
         for i, recipe in enumerate(recipes.values()):
             if self._is_existed_recipe(recipe):
@@ -1006,7 +1010,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
             note_store.createNote(note)
             
             with processed_list_filename.open("a") as fp:
-                fp.write("{}\n".format(recipe.id))
+                fp.write("{}\t{}\n".format(recipe.id, recipe.detail_url))
         
             time.sleep(1)
 
