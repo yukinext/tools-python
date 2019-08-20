@@ -260,7 +260,7 @@ class RecipeCrawlerTemplate(object):
                 logger.info("{} ({:05d}/{:05d}): get : {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
         # get detail recipe info
-        for target_fn in sorted(self.cache_dir.glob("[!_*]*"), key=lambda k: self._sortkey_cache_filename(k)):
+        for target_fn in sorted(self.cache_dir.glob("[!_|.*]*"), key=lambda k: self._sortkey_cache_filename(k)):
             if not self._is_valid_cache_filename(target_fn):
                 logger.debug("{}: skip file : {}".format(self.__class__.site_name, target_fn.name))
                 continue
@@ -1067,7 +1067,7 @@ def main():
             NhkKobaraGaSukimashitaRecipeCrawler(),
             ]])
 
-    config = yaml.load(args.config_yaml_filename.open("r").read())
+    config = yaml.safe_load(args.config_yaml_filename.open("r").read())
     if args.view:
         view_results = dict()
         for site, site_config in config.items():
