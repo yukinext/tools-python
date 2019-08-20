@@ -110,3 +110,4 @@ _*.txt
 .DS_Store
 cred.json
 .work*/
+logs/
