@@ -234,7 +234,7 @@ class RecipeCrawlerTemplate(object):
     def process(self):
         logger.info("{}: proc start".format(self.__class__.site_name))
         
-        recipes = dict() # key: Recipe.id, value: Recipe
+        recipes = dict() # key: Recipe.id. value: Recipe
 
         for entry_url in self.entry_urls:
             res = requests.get(entry_url, verify=False)
@@ -242,7 +242,7 @@ class RecipeCrawlerTemplate(object):
                 soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
                 recipes.update(self._get_recipe_overviews(soup, entry_url))
 
-        processed_recipe_ids = dict() # key: id. value: detail_url
+        processed_recipe_ids = dict() # key: Recipe.id. value: detail_url
             
         if self.processed_list_filename.exists():
             with self.processed_list_filename.open() as fp:
