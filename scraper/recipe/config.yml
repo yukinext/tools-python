@@ -55,3 +55,8 @@ nhk_kobara_ta:
     entry_urls:
         - "https://www4.nhk.or.jp/P4131/22/"
         - "https://www4.nhk.or.jp/P4131/23/"
+nhk_kiichi:
+    enable: true
+    program_name: "NHK BSコンシェルジュ 板長稲塚の割烹Kiichiへようこそ"
+    entry_urls:
+        - "https://www4.nhk.or.jp/bscon/23/"
