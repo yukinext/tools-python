@@ -28,6 +28,7 @@ import mimetypes
 import dateutil.parser
 import pprint
 import pickle
+import math
 
 import jinja2
 from evernote.api.client import EvernoteClient
@@ -251,15 +252,17 @@ class RecipeCrawlerTemplate(object):
                 processed_recipe_ids.update([self._trans_to_recipe_id_from_str(l.strip()) for l in fp.readlines() if len(l.strip())])
         
         recipes_num = len(recipes)
+        recipes_num_digits = len(str(recipes_num))
+        message_current_max = "({{:0{digits}d}}/{{:0{digits}d}})".format(digits=recipes_num_digits)
         for i, recipe in enumerate(recipes.values()):
             if self._is_existed_recipe(recipe):
-                logger.debug("{} ({:05d}/{:05d}): skip: {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                logger.debug(("{} " + message_current_max + ": skip: {}").format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 continue
     
             time.sleep(1)
             res = requests.get(recipe.detail_url, verify=False)
             if res.ok:
-                logger.info("{} ({:05d}/{:05d}): get : {}".format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
+                logger.info(("{} " + message_current_max + ": get : {}").format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
         # get detail recipe info
         for target_fn in sorted(self.cache_dir.glob("[!_|.*]*"), key=lambda k: self._sortkey_cache_filename(k)):
@@ -992,11 +995,12 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
 
         is_note_exist = False
         if is_note_exist_check:
-            filter = NSTypes.NoteFilter()
-            filter.notebookGuid = target_notebook.guid        
+            note_filter = NSTypes.NoteFilter()
+            note_filter.notebookGuid = target_notebook.guid
+            note_filter.words = note_title
             resultSpec = NSTypes.NotesMetadataResultSpec()
             resultSpec.includeTitle = True
-            metalist = note_store.findNotesMetadata(filter, 0, 10, resultSpec)
+            metalist = note_store.findNotesMetadata(note_filter, 0, 10, resultSpec)
     
             for meta_ in metalist.notes:
                 if note_title == meta_.title:
@@ -1013,6 +1017,49 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
             yield recipe
         
             time.sleep(1)
+
+def change_tag_evernote(args, evernote_cred):
+    client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
+    note_store = client.get_note_store()
+    
+    notebook_name = evernote_cred["notebook_name"]
+    notebooks = note_store.listNotebooks()
+    target_notebook = None
+    for notebook in notebooks:
+        if notebook_name == notebook.name:
+            target_notebook = notebook
+            break
+
+    note_filter = NSTypes.NoteFilter()
+    note_filter.notebookGuid = target_notebook.guid
+
+    notes_per_page = 50
+    note_list = note_store.findNotes(note_filter, 0, 1)
+    note_num = note_list.totalNotes
+    max_page_num = math.ceil(note_num / notes_per_page)
+    note_num_digits = len(str(note_num))
+    message_current_max = "({{:0{digits}d}}/{{:0{digits}d}})".format(digits=note_num_digits)
+    for page_num in range(0, max_page_num):
+        note_list = note_store.findNotes(note_filter, notes_per_page * page_num, notes_per_page * (page_num + 1))
+        
+        for i, note in enumerate(note_list.notes):
+            logger.info((message_current_max + ": {}").format(notes_per_page * page_num + i + 1, note_num, note.title))
+            current_tag_names = note_store.getNoteTagNames(note.guid)
+            new_tag_names = set()
+            for current_tag_name in current_tag_names:
+                try:
+                    program_date = dateutil.parser.parse(current_tag_name)
+                    new_tag_names.add("{:%Y}".format(program_date))
+                    new_tag_names.add("{:%Y.%m}".format(program_date))
+                except:
+                    new_tag_names.add(current_tag_name)
+                    
+            logger.info("change tags: {}->{}".format(current_tag_names, new_tag_names))
+            note.tagGuids.clear()
+            note.content = None
+            note.resources = None
+            note.tagNames = new_tag_names
+            note_store.updateNote(note)
 
 def store_local(store_dirname, recipe):
     pickle_filename = store_dirname / "{}.pickle".format(recipe.id)
@@ -1102,6 +1149,8 @@ def main():
         return
     
     evernote_cred = _get_evernote_credential(args.credential_json_filename)
+    # change_tag_evernote(args, evernote_cred)
+
     if args.sites is None or len(args.sites) == 0:
         args.sites = [key for key in config.keys()]
     
@@ -1123,7 +1172,6 @@ def main():
                 logger.warning("disable: {}".format(site))
         else:
             logger.warning("not exist: {}".format(site))
-                    
 
 if __name__ == "__main__":
     main()
