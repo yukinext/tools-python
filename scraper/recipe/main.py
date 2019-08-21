@@ -147,7 +147,8 @@ class EvernoteTransrator(object):
         ret = set(EvernoteTransrator.default_tag_names)
         ret.add(self.recipe.program_name)
         if self.recipe.program_date:
-            ret.add("{:%Y.%m.%d}".format(self.recipe.program_date))
+            ret.add("{:%Y.%m}".format(self.recipe.program_date))
+            ret.add("{:%Y}".format(self.recipe.program_date))
         if self.site_config.get("tag_names"):
             ret.update(self.site_config["tag_names"])
         return ret
