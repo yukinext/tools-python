@@ -144,6 +144,13 @@ class EvernoteTransrator(object):
         return image_resources, jinja2.Template(EvernoteTransrator._template).render(recipe=self.recipe, image_resources=image_resources)
     
     @property
+    def attributes(self):
+        ret = Types.NoteAttributes()
+        ret.sourceURL = self.recipe.detail_url
+        
+        return ret
+    
+    @property
     def tag_names(self):
         ret = set(EvernoteTransrator.default_tag_names)
         ret.add(self.recipe.program_name)
@@ -1055,7 +1062,8 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
         if not is_note_exist:
             logger.info("create note: {}".format(note_title))
             resources, body = trans.body_resources
-            note = Types.Note(title=note_title, content=body, resources=resources.values(), notebookGuid=target_notebook.guid)
+            attributes = trans.attributes
+            note = Types.Note(title=note_title, content=body, resources=resources.values(), attributes=attributes, notebookGuid=target_notebook.guid)
             note.tagNames = trans.tag_names
             note_store.createNote(note)
             
