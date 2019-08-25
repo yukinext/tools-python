@@ -1061,9 +1061,8 @@ class TscGrandmotherKitchenRecipeCrawler(RecipeCrawlerTemplate):
             res = requests.get(entry_url)
             if res.ok:
                 soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
-                last_page_url = soup.find("div", "pagination").find_all("a")[-1]["src"]
+                last_page_url = soup.find("div", "pagination").find_all("a")[-1]["href"]
                 page_url, last_page_num_str = re.search(r"(.*)/(\d+)/$", last_page_url).groups()
-                
                 for page_num in range(1, int(last_page_num_str) + 1):
                     ret.add("{}/{}/".format(page_url, page_num))
             
