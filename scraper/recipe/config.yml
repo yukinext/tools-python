@@ -63,5 +63,6 @@ nhk_kiichi:
 tsc_grandmother_kitchen:
     enable: true
     program_name: "TSC おばあちゃんの台所"
+    is_expand_entry_urls: false
     entry_urls:
         - "https://www.webtsc.com/prog/obaachan/recipe/"

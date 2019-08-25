@@ -237,6 +237,8 @@ class RecipeCrawlerTemplate(object):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
     
         self.entry_urls = site_config["entry_urls"]
+        if site_config.get("is_expand_entry_urls", False):
+            self.entry_urls = self._expand_entry_urls()
     
         self.processed_list_filename = args.work_dir / "_{}{}".format(self.__class__.site_name, args.processed_list_filename_postfix)
         if site_config.get("processed_list_filename"):
@@ -248,7 +250,7 @@ class RecipeCrawlerTemplate(object):
         
         recipes = dict() # key: Recipe.id, value: Recipe
 
-        for entry_url in self._expand_entry_urls():
+        for entry_url in self.entry_urls:
             res = requests.get(entry_url, verify=False)
             if res.ok:
                 soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
