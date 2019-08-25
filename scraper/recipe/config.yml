@@ -60,3 +60,8 @@ nhk_kiichi:
     program_name: "NHK BSコンシェルジュ 板長稲塚の割烹Kiichiへようこそ"
     entry_urls:
         - "https://www4.nhk.or.jp/bscon/23/"
+tsc_grandmother_kitchen:
+    enable: true
+    program_name: "TSC おばあちゃんの台所"
+    entry_urls:
+        - "https://www.webtsc.com/prog/obaachan/recipe/"
