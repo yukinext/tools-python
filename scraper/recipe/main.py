@@ -821,42 +821,66 @@ class NikomaruKitchenRecipeCrawler(RecipeCrawlerTemplate):
 class NhkKobaraSuitemasenkaRecipeCrawler(RecipeCrawlerTemplate):
     site_name = "nhk_kobara_ka"
 
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return target_id_str
+
+    def _sortkey_cache_filename(self, target_fn):
+        return target_fn.stem
+
+    def _is_valid_cache_filename(self, target_fn):
+        return not target_fn.stem.startswith("_")
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return target_fn.stem
+
     def _get_recipe_overviews(self, overview_soup, entry_url):
         recipes = dict() # key: Recipe.id, value: Recipe
-        items = iter(overview_soup.find_all("section")[1:-1])
-        for item in items:
-            subtitle_node = item
-            title_node = next(items)
-            recipe = Recipe()
-            recipe.detail_url = entry_url
-            recipe.cooking_name = title_node.h2.text.replace("「", "").replace("」", "").strip()
-            recipe.cooking_name_sub = subtitle_node.h2.text.strip()
-            recipe.program_name = self.program_name
-            recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
-            recipe.image_urls.append(urllib.parse.urljoin(entry_url, title_node.img["src"]))
+
+        current_subtitle = None
+        current_recipe_important_points = list()
+        for item in overview_soup.find_all("section")[1:]:
+            if item.h1:
+                continue
             
-            is_material_area = False
-            is_recipe_step_area = False
-            for l in title_node.find("div", "option-media-row").get_text("\n").splitlines():
-                if len(l.strip()) == 0:
-                    continue
+            subtitle_node = item.find("h2", "option-sub-title")
+            if subtitle_node and subtitle_node.find_next_sibling("p") is None: # 
+                current_subtitle = subtitle_node.text.replace("「", "").replace("」", "").strip()
+                current_recipe_important_points.clear()
+                continue            
+            
+            if item.h2:
+                title_node = item
                 
-                if -1 < l.find("＜材料＞"):
-                    is_material_area = True
-                    recipe.materials.append(RecipeText(l.replace("＜材料＞", "").replace("(", "（").replace(")", "）")))
-                    continue
-                if -1 < l.find("＜作り方＞"):
-                    is_material_area = False
-                    is_recipe_step_area = True
-                    continue
-                
-                if is_material_area:
-                    recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
-                elif is_recipe_step_area:
-                    recipe.recipe_steps.append(RecipeText(l))
+                recipe = Recipe()
+                recipe.detail_url = entry_url
+                recipe.cooking_name = title_node.h2.text.replace("「", "").replace("」", "").strip()
+                recipe.cooking_name_sub = current_subtitle
+                recipe.program_name = self.program_name
+                recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
+                recipe.image_urls.append(urllib.parse.urljoin(entry_url, title_node.img["src"]))
+            
+                is_material_area = False
+                is_recipe_step_area = False
+                for l in title_node.find("div", "option-media-row").get_text("\n").splitlines():
+                    if len(l.strip()) == 0:
+                        continue
                     
-            recipe.id = int("{:%Y%m%d}".format(recipe.program_date))
-            recipes[recipe.id] = recipe
+                    if -1 < l.find("＜材料＞"):
+                        is_material_area = True
+                        recipe.materials.append(RecipeText(l.replace("＜材料＞", "").replace("(", "（").replace(")", "）")))
+                        continue
+                    if -1 < l.find("＜作り方＞"):
+                        is_material_area = False
+                        is_recipe_step_area = True
+                        continue
+                    
+                    if is_material_area:
+                        recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
+                    elif is_recipe_step_area:
+                        recipe.recipe_steps.append(RecipeText(l))
+                        
+                recipe.id = "{:%Y%m%d}_{}".format(recipe.program_date, hashlib.md5(("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name) if recipe.cooking_name_sub else recipe.cooking_name).encode("utf-8")).hexdigest())
+                recipes[recipe.id] = recipe
 
         return recipes
     
@@ -956,7 +980,7 @@ class NhkKobaraGaSukimashitaRecipeCrawler(RecipeCrawlerTemplate):
                     else:
                         recipe.recipe_steps.append(RecipeText(l))
 
-            recipe.id = hashlib.md5(("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name) if recipe.cooking_name_sub else recipe.cooking_name).encode("utf-8")).hexdigest()            
+            recipe.id = hashlib.md5(("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name) if recipe.cooking_name_sub else recipe.cooking_name).encode("utf-8")).hexdigest()          
             recipes[recipe.id] = recipe
 
         return recipes
@@ -1139,10 +1163,10 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
             note = Types.Note(title=note_title, content=body, resources=resources.values(), attributes=attributes, notebookGuid=target_notebook.guid)
             note.tagNames = trans.tag_names
             note_store.createNote(note)
-            
-            yield recipe
-        
             time.sleep(1)
+            
+        yield recipe
+    
 
 def change_tag_evernote(args, evernote_cred):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
