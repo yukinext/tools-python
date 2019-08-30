@@ -225,6 +225,8 @@ class RecipeText(object):
     
 class RecipeCrawlerTemplate(object):
     site_name = ""
+    _TABLE_REMOVE_KAKKO = str.maketrans({"「": "", "」": ""})
+    _TABLE_REPLACE_MARUKAKKO = str.maketrans({"(": "（", ")":"）"})
     def __init__(self):
         pass
 
@@ -587,7 +589,7 @@ class ThreeMinCookingRecipeCrawler(RecipeCrawlerTemplate):
         material_title_node = detail_soup.find("div", "ingredient")
         recipe_steps_title_node = detail_soup.find("div", "howto")
         
-        material_title = material_title_node.h4.text.replace("材料", "").replace("(", "（").replace(")", "）").strip()
+        material_title = material_title_node.h4.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
         if material_title:
             recipe.materials.append(RecipeText(material_title))
         for material in material_title_node.find_all("tr"):
@@ -655,7 +657,7 @@ class OishimeshiRecipeCrawler(RecipeCrawlerTemplate):
 
         material_title_node = detail_soup.select_one("#zairyou_box")
         recipe_steps_title_node = detail_soup.find("table", "recipe")
-        material_title = material_title_node.p.text.replace("材料", "").replace("（", "（").replace(")", "）").strip()
+        material_title = material_title_node.p.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
         if material_title:
             recipe.materials.append(RecipeText(material_title))
         recipe.materials.extend([RecipeText(": ".join([mm.text for mm in m.find_all("td") if len(mm.text.strip())])) for m in material_title_node.find_all("tr")])
@@ -846,7 +848,7 @@ class NhkKobaraSuitemasenkaRecipeCrawler(RecipeCrawlerTemplate):
             
             subtitle_node = item.find("h2", "option-sub-title")
             if subtitle_node and subtitle_node.find_next_sibling("p") is None: # 
-                current_subtitle = subtitle_node.text.replace("「", "").replace("」", "").strip()
+                current_subtitle = subtitle_node.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
                 current_recipe_important_points.clear()
                 continue            
             
@@ -855,7 +857,7 @@ class NhkKobaraSuitemasenkaRecipeCrawler(RecipeCrawlerTemplate):
                 
                 recipe = Recipe()
                 recipe.detail_url = entry_url
-                recipe.cooking_name = title_node.h2.text.replace("「", "").replace("」", "").strip()
+                recipe.cooking_name = title_node.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
                 recipe.cooking_name_sub = current_subtitle
                 recipe.program_name = self.program_name
                 recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
@@ -869,7 +871,7 @@ class NhkKobaraSuitemasenkaRecipeCrawler(RecipeCrawlerTemplate):
                     
                     if -1 < l.find("＜材料＞"):
                         is_material_area = True
-                        recipe.materials.append(RecipeText(l.replace("＜材料＞", "").replace("(", "（").replace(")", "）")))
+                        recipe.materials.append(RecipeText(l.replace("＜材料＞", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO)))
                         continue
                     if -1 < l.find("＜作り方＞"):
                         is_material_area = False
@@ -923,7 +925,7 @@ class NhkKobaraGaSukimashitaRecipeCrawler(RecipeCrawlerTemplate):
                 continue
             
             if item.h2:
-                current_subtitle = item.h2.text.replace("「", "").replace("」", "").strip()
+                current_subtitle = item.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
                 current_recipe_important_points.clear()
                 continue
             
@@ -960,7 +962,7 @@ class NhkKobaraGaSukimashitaRecipeCrawler(RecipeCrawlerTemplate):
                 
                 if -1 < l.find("◎材料"):
                     is_material_area = True
-                    material_title = l.replace("◎材料", "").replace("(", "（").replace(")", "）").strip()
+                    material_title = l.replace("◎材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
                     if len(material_title):
                         recipe.materials.append(RecipeText(material_title))
                     continue
@@ -1008,7 +1010,7 @@ class NhkKiichiRecipeCrawler(RecipeCrawlerTemplate):
             title_node = next(items)
             recipe = Recipe()
             recipe.detail_url = entry_url
-            recipe.cooking_name = title_node.h2.text.replace("「", "").replace("」", "").strip()
+            recipe.cooking_name = title_node.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
             recipe.cooking_name_sub = subtitle_node.h2.text.strip()
             recipe.program_name = self.program_name
             recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
@@ -1023,7 +1025,7 @@ class NhkKiichiRecipeCrawler(RecipeCrawlerTemplate):
                 if -1 < l.find("【材料】"):
                     if is_recipe_step_area == False:
                         is_material_area = True
-                        l = l.replace("【材料】", "").replace("(", "（").replace(")", "）").strip()
+                        l = l.replace("【材料】", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
                         if len(l):
                             recipe.materials.append(RecipeText(l))
                         continue
@@ -1075,7 +1077,7 @@ class TscGrandmotherKitchenRecipeCrawler(RecipeCrawlerTemplate):
         for item in overview_soup.find_all("article", "post-archive"):
             recipe = Recipe()
             
-            cns_buf = [l.replace("「","").replace("」", "") for l in reversed(item.h2.get_text("\n").splitlines())]
+            cns_buf = [l.translate(self.__class__._TABLE_REMOVE_KAKKO) for l in reversed(item.h2.get_text("\n").splitlines())]
             cns_buf.insert(1, item.find("div", "recipe-archive-cast").text)
             
             recipe.cooking_name_sub = "/".join(cns_buf)
@@ -1096,14 +1098,14 @@ class TscGrandmotherKitchenRecipeCrawler(RecipeCrawlerTemplate):
                 continue
 
             recipe = copy.deepcopy(overview_recipe)
-            recipe.cooking_name = recipe_box_node.h3.text.replace("「", "").replace("」", "")
+            recipe.cooking_name = recipe_box_node.h3.text.translate(self.__class__._TABLE_REMOVE_KAKKO)
             recipe.image_urls.append(detail_soup.find("div", "recipe-food-img").img["src"])
     
             material_title_node = recipe_box_node.find("div", "recipe-material")
             m_buf = []
             m_buf.append("（{}）".format(material_title_node.span.text))
             for dt in material_title_node.find_all("dt"):
-                material_title = dt.text.replace("材料", "").replace("(", "（").replace(")", "）").strip()
+                material_title = dt.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
                 if len(material_title):
                     m_buf.append(material_title)
                 dd = dt.find_next_sibling("dd")
