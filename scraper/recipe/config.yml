@@ -1,49 +1,18 @@
-nhk_umai:
-    enable: true
-    program_name: "NHK うまいッ！"
-    entry_urls:
-        - "http://www6.nhk.or.jp/umai/recipe/index01.html"
-        - "http://www6.nhk.or.jp/umai/recipe/index02.html"
-        - "http://www6.nhk.or.jp/umai/recipe/index03.html"
-        - "http://www6.nhk.or.jp/umai/recipe/index04.html"
-    cache_dir: ~
-    processed_list_filename: ~
-    tag_names: ~
 danshigohan:
     enable: true
     program_name: "テレ東 男子ごはん"
     entry_urls:
         - "https://www.tv-tokyo.co.jp/danshigohan/recipe/"
-rsk_cooking_recipe:
-    enable: true
-    program_name: "RSK クッキング・レシピ"
-    entry_urls:
-        - "http://www.rsk.co.jp/tv/recipe/"
-oshaberi:
-    enable: true
-    program_name: "ABC 上沼恵美子のおしゃべりクッキング"
-    entry_urls:
-        - "https://www.asahi.co.jp/oshaberi/main.html"
-three_minutes_cooking:
-    enable: true
-    program_name: "NTV キューピー3分クッキング"
-    entry_urls:
-        - "http://www.ntv.co.jp/3min/airdate/"
-oishimeshi:
-    enable: true
-    program_name: "CSネット コープのおいしめし"
-    entry_urls:
-        - "https://www.csnet.coop/movies/recipemovie.cgi?template=index.html"
 nhk_kamado:
     enable: true
     program_name: "NHK グレーテルのかまど"
     entry_urls:
         - "https://www.nhk.or.jp/kamado/recipe.html"
-nikomaru:
+nhk_kiichi:
     enable: true
-    program_name: "KSB にこまるキッチン"
+    program_name: "NHK BSコンシェルジュ 板長稲塚の割烹Kiichiへようこそ"
     entry_urls:
-        - "http://setonaikai.co.jp/250/paradise/list"
+        - "https://www4.nhk.or.jp/bscon/23/"
 nhk_kobara_ka:
     enable: true
     program_name: "NHK きじまりゅうたの小腹すいてませんか？"
@@ -55,11 +24,42 @@ nhk_kobara_ta:
     entry_urls:
         - "https://www4.nhk.or.jp/P4131/22/"
         - "https://www4.nhk.or.jp/P4131/23/"
-nhk_kiichi:
+nhk_umai:
     enable: true
-    program_name: "NHK BSコンシェルジュ 板長稲塚の割烹Kiichiへようこそ"
+    program_name: "NHK うまいッ！"
     entry_urls:
-        - "https://www4.nhk.or.jp/bscon/23/"
+        - "http://www6.nhk.or.jp/umai/recipe/index01.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index02.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index03.html"
+        - "http://www6.nhk.or.jp/umai/recipe/index04.html"
+    cache_dir: ~
+    processed_list_filename: ~
+    tag_names: ~
+nikomaru:
+    enable: true
+    program_name: "KSB にこまるキッチン"
+    entry_urls:
+        - "http://setonaikai.co.jp/250/paradise/list"
+oishimeshi:
+    enable: true
+    program_name: "CSネット コープのおいしめし"
+    entry_urls:
+        - "https://www.csnet.coop/movies/recipemovie.cgi?template=index.html"
+oshaberi:
+    enable: true
+    program_name: "ABC 上沼恵美子のおしゃべりクッキング"
+    entry_urls:
+        - "https://www.asahi.co.jp/oshaberi/main.html"
+rsk_cooking_recipe:
+    enable: true
+    program_name: "RSK クッキング・レシピ"
+    entry_urls:
+        - "http://www.rsk.co.jp/tv/recipe/"
+three_minutes_cooking:
+    enable: true
+    program_name: "NTV キューピー3分クッキング"
+    entry_urls:
+        - "http://www.ntv.co.jp/3min/airdate/"
 tsc_grandmother_kitchen:
     enable: true
     program_name: "TSC おばあちゃんの台所"
