@@ -6,9 +6,6 @@ Created on Fri Aug 30 21:48:49 2019
 @author: yuki_next
 """
 
-import sys,os
-sys.path.append(os.pardir)
-
 from .bases import RecipeCrawlerTemplate
 from .danshigohan import DanshigohanRecipeCrawler
 from .nhk_kamado import NhkKamadoRecipeCrawler

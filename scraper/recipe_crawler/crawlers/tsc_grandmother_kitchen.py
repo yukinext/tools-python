@@ -7,7 +7,7 @@ Created on Fri Aug 30 22:10:59 2019
 
 """
 from . import bases
-from models import Recipe, RecipeText
+from recipe_crawler.models import Recipe, RecipeText
 
 from bs4 import BeautifulSoup
 import re

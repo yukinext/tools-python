@@ -6,7 +6,7 @@ Created on Fri Aug 30 21:26:59 2019
 @author: yuki_next
 """
 
-import models
+import recipe_crawler.models
 import jinja2
 import logging
 import evernote.edam.type.ttypes as Types
@@ -78,7 +78,7 @@ class EvernoteTranslator(object):
 """
 
     def __init__(self, recipe, site_config):
-        assert isinstance(recipe, models.Recipe)
+        assert isinstance(recipe, recipe_crawler.models.Recipe)
         self.recipe = recipe
         self.site_config = site_config
 

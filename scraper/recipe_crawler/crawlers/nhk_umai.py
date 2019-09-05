@@ -7,7 +7,7 @@ Created on Fri Aug 30 21:48:13 2019
 """
 
 from . import bases
-from models import Recipe, RecipeText
+from recipe_crawler.models import Recipe, RecipeText
 import urllib
 import re
 import pathlib

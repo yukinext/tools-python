@@ -20,8 +20,9 @@ import pprint
 import pickle
 import math
 
-import translators
-import crawlers
+import recipe_crawler.models
+import recipe_crawler.translators
+import recipe_crawler.crawlers
 
 from evernote.api.client import EvernoteClient
 import evernote.edam.type.ttypes as Types
@@ -31,7 +32,7 @@ import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 urllib3.disable_warnings(InsecureRequestWarning)
 
-logging.config.fileConfig('logging.config', disable_existing_loggers=False)
+logging.config.fileConfig('recipe_crawler_logging.config', disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
 yaml.add_representer(collections.OrderedDict, lambda dumper, instance: dumper.represent_mapping('tag:yaml.org,2002:map', instance.items()))
@@ -59,7 +60,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
 
     # for processed_list_filename, recipe in recipes(args, site_config):
     for recipe in recipes():
-        trans = translators.EvernoteTranslator(recipe, site_config)
+        trans = recipe_crawler.translators.EvernoteTranslator(recipe, site_config)
         note_title = trans.title
 
         is_note_exist = False
@@ -173,11 +174,12 @@ def _get_evernote_credential(credential_json_filename):
 
 def main():
     parser = argparse.ArgumentParser()
+    root_dir = pathlib.Path(sys.argv[0]).parent
     parser.add_argument("sites", nargs="*", help="site name in config yaml file. no input is select all sites")
     parser.add_argument("--view-config", action="store_true")
-    parser.add_argument("--config-yaml-filename", default=pathlib.Path(sys.argv[0]).parent / "config.yml", type=pathlib.Path)
-    parser.add_argument("--work-dir", default=pathlib.Path(sys.argv[0]).parent / ".work_recipes", type=pathlib.Path, help="working directory")
-    parser.add_argument("--credential-json-filename", default=pathlib.Path(sys.argv[0]).parent / "cred.json", type=pathlib.Path)
+    parser.add_argument("--config-yaml-filename", default=root_dir / "recipe_crawler_config.yml", type=pathlib.Path)
+    parser.add_argument("--work-dir", default=root_dir / ".work_recipes", type=pathlib.Path, help="working directory")
+    parser.add_argument("--credential-json-filename", default=root_dir / "recipe_crawler_cred.json", type=pathlib.Path)
     parser.add_argument("--no-check-existed-note", action="store_true", help="no check existed notes and append new note. if do not check existed note and skip.")
     parser.add_argument("--processed-list-filename-postfix", default="_processed_data.txt")
 
@@ -188,19 +190,19 @@ def main():
         logger.error("not exists config file: {}".format(args.config_yaml_filename))
         return
 
-    recipe_crawlers = dict([(crawler.site_name, crawler) for crawler in [
-            crawlers.NhkUmaiRecipeCrawler(),
-            crawlers.DanshigohanRecipeCrawler(),
-            crawlers.RskCookingRecipeRecipeCrawler(),
-            crawlers.OshaberiRecipeCrawler(),
-            crawlers.ThreeMinCookingRecipeCrawler(),
-            crawlers.OishimeshiRecipeCrawler(),
-            crawlers.NhkKamadoRecipeCrawler(),
-            crawlers.NikomaruKitchenRecipeCrawler(),
-            crawlers.NhkKobaraSuitemasenkaRecipeCrawler(),
-            crawlers.NhkKobaraGaSukimashitaRecipeCrawler(),
-            crawlers.NhkKiichiRecipeCrawler(),
-            crawlers.TscGrandmotherKitchenRecipeCrawler(),
+    crawlers = dict([(crawler.site_name, crawler) for crawler in [
+            recipe_crawler.crawlers.NhkUmaiRecipeCrawler(),
+            recipe_crawler.crawlers.DanshigohanRecipeCrawler(),
+            recipe_crawler.crawlers.RskCookingRecipeRecipeCrawler(),
+            recipe_crawler.crawlers.OshaberiRecipeCrawler(),
+            recipe_crawler.crawlers.ThreeMinCookingRecipeCrawler(),
+            recipe_crawler.crawlers.OishimeshiRecipeCrawler(),
+            recipe_crawler.crawlers.NhkKamadoRecipeCrawler(),
+            recipe_crawler.crawlers.NikomaruKitchenRecipeCrawler(),
+            recipe_crawler.crawlers.NhkKobaraSuitemasenkaRecipeCrawler(),
+            recipe_crawler.crawlers.NhkKobaraGaSukimashitaRecipeCrawler(),
+            recipe_crawler.crawlers.NhkKiichiRecipeCrawler(),
+            recipe_crawler.crawlers.TscGrandmotherKitchenRecipeCrawler(),
             ]])
 
     config = yaml.safe_load(args.config_yaml_filename.open("r").read())
@@ -227,15 +229,15 @@ def main():
         args.sites = [key for key in config.keys()]
     
     for site in args.sites:
-        if site in config and site in recipe_crawlers:
+        if site in config and site in crawlers:
             site_config = config[site]
             if site_config["enable"]:
-                recipe_crawler = recipe_crawlers[site]
-                recipe_crawler.init(args, site_config)
-                recipe_pickle_dir = recipe_crawler.cache_dir / "_pickle"
+                crawler = crawlers[site]
+                crawler.init(args, site_config)
+                recipe_pickle_dir = crawler.cache_dir / "_pickle"
                 recipe_pickle_dir.mkdir(parents=True, exist_ok=True)
-                for recipe in store_evernote(recipe_crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
-                    with recipe_crawler.processed_list_filename.open("a") as fp:
+                for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
+                    with crawler.processed_list_filename.open("a") as fp:
                         fp.write("{}\n".format(recipe.id))
                     
                     store_local(recipe_pickle_dir, recipe)

@@ -12,7 +12,7 @@ import requests
 import time
 import chardet
 import logging
-import models
+import recipe_crawler.models
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class RecipeCrawlerTemplate(object):
         return self.entry_urls
     
     def _is_existed_recipe(self, recipe):
-        assert isinstance(recipe, models.Recipe)
+        assert isinstance(recipe, recipe_crawler.models.Recipe)
         return (self.cache_dir / str(recipe.id)).exists()
 
     def _get_new_fn(self, from_path, prefix_mark, prefix_times):

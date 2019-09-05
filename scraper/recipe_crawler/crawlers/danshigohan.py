@@ -7,7 +7,7 @@ Created on Fri Aug 30 21:54:28 2019
 """
 
 from . import bases
-from models import Recipe, RecipeText
+from recipe_crawler.models import Recipe, RecipeText
 import re
 import dateutil
 import logging
