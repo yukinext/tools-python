@@ -108,6 +108,6 @@ out/
 html/
 _*.txt
 .DS_Store
-cred.json
+*cred.json
 .work*/
 logs/
