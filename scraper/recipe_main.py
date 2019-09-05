@@ -13,6 +13,7 @@ import yaml
 import collections
 import pathlib
 import sys
+import inspect
 import json
 import time
 import dateutil.parser
@@ -190,21 +191,9 @@ def main():
         logger.error("not exists config file: {}".format(args.config_yaml_filename))
         return
 
-    crawlers = dict([(crawler.site_name, crawler) for crawler in [
-            recipe_crawler.crawlers.NhkUmaiRecipeCrawler(),
-            recipe_crawler.crawlers.DanshigohanRecipeCrawler(),
-            recipe_crawler.crawlers.RskCookingRecipeRecipeCrawler(),
-            recipe_crawler.crawlers.OshaberiRecipeCrawler(),
-            recipe_crawler.crawlers.ThreeMinCookingRecipeCrawler(),
-            recipe_crawler.crawlers.OishimeshiRecipeCrawler(),
-            recipe_crawler.crawlers.NhkKamadoRecipeCrawler(),
-            recipe_crawler.crawlers.NikomaruKitchenRecipeCrawler(),
-            recipe_crawler.crawlers.NhkKobaraSuitemasenkaRecipeCrawler(),
-            recipe_crawler.crawlers.NhkKobaraGaSukimashitaRecipeCrawler(),
-            recipe_crawler.crawlers.NhkKiichiRecipeCrawler(),
-            recipe_crawler.crawlers.TscGrandmotherKitchenRecipeCrawler(),
-            ]])
-
+    crawlers = [crawler_clazz() for _, crawler_clazz in inspect.getmembers(recipe_crawler.crawlers, inspect.isclass) if issubclass(crawler_clazz, recipe_crawler.crawlers.bases.RecipeCrawlerTemplate) and not inspect.isabstract(crawler_clazz)]
+    crawlers_map = dict([(crawler.site_name, crawler) for crawler in crawlers])
+    
     config = yaml.safe_load(args.config_yaml_filename.open("r").read())
     if args.view_config:
         view_results = dict()
@@ -229,10 +218,10 @@ def main():
         args.sites = [key for key in config.keys()]
     
     for site in args.sites:
-        if site in config and site in crawlers:
+        if site in config and site in crawlers_map:
             site_config = config[site]
             if site_config["enable"]:
-                crawler = crawlers[site]
+                crawler = crawlers_map[site]
                 crawler.init(args, site_config)
                 recipe_pickle_dir = crawler.cache_dir / "_pickle"
                 recipe_pickle_dir.mkdir(parents=True, exist_ok=True)

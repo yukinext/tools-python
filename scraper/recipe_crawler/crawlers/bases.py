@@ -6,6 +6,8 @@ Created on Fri Aug 30 21:18:51 2019
 @author: yuki_next
 """
 
+from abc import ABCMeta, abstractmethod
+
 import pathlib
 from bs4 import BeautifulSoup
 import requests
@@ -16,7 +18,7 @@ import recipe_crawler.models
 
 logger = logging.getLogger(__name__)
 
-class RecipeCrawlerTemplate(object):
+class RecipeCrawlerTemplate(metaclass=ABCMeta):
     site_name = ""
     _TABLE_REMOVE_KAKKO = str.maketrans({"「": "", "」": ""})
     _TABLE_REPLACE_MARUKAKKO = str.maketrans({"(": "（", ")":"）"})
@@ -126,9 +128,11 @@ class RecipeCrawlerTemplate(object):
     def _get_recipe_id_from_cache_file(self, target_fn):
         return int(target_fn.stem)
 
+    @abstractmethod
     def _get_recipe_overviews(self, overview_soup, entry_url):
         pass
     
+    @abstractmethod
     def _recipe_details_generator(self, detail_soup, recipe):
         """
         must deepcopy "recipe" before use
