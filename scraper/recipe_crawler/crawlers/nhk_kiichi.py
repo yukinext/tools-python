@@ -24,7 +24,7 @@ class NhkKiichiRecipeCrawler(bases.RecipeCrawlerTemplate):
         items = iter(overview_soup.find_all("section")[1:-1])
         for item in items:
             if item.h2 is None:
-                item = next(items)
+                continue
             subtitle_node = item
             title_node = next(items)
             recipe = Recipe()
