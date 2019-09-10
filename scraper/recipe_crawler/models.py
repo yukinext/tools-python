@@ -13,7 +13,7 @@ class Recipe(object):
     def __init__(self):
         self.id = None
         self.detail_url = None
-        self.image_urls = list() # original image sourece urls
+        self.image_urls = list() # original image source urls
         self.cooking_name = None # 料理名
         self.cooking_name_sub = None
         self.program_name = None # 番組名
