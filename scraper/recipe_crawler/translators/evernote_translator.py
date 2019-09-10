@@ -52,10 +52,6 @@ class EvernoteTranslator(object):
 
 {%- if 0 < recipe.recipe_steps|length %}
 <h2>作り方</h2>
-{%- for important_point in recipe.important_points %}
-<strong>{{ important_point.text }}</strong><br/>
-{%- endfor %}
-
 <ul>
 {%- for recipe_step in recipe.recipe_steps %}
     <li>
@@ -73,6 +69,11 @@ class EvernoteTranslator(object):
 {%- endfor %}
 </ul>
 {%- endif %}
+
+{%- for important_point in recipe.important_points %}
+<strong>{{ important_point.text }}</strong><br/>
+{%- endfor %}
+
 {%- endautoescape %}
 </en-note>
 """

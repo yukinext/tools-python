@@ -6,4 +6,4 @@ Created on Fri Aug 30 22:37:33 2019
 @author: yuki_next
 """
 
-from .EvernoteTranslator import *
+from .evernote_translator import *

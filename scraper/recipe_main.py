@@ -176,7 +176,7 @@ def _get_evernote_credential(credential_json_filename):
 def main():
     parser = argparse.ArgumentParser()
     root_dir = pathlib.Path(sys.argv[0]).parent
-    parser.add_argument("sites", nargs="*", help="site name in config yaml file. no input is select all sites")
+    parser.add_argument("sites", nargs="*", help="site name in config yaml file. no input is select all sites. if specified explicitly, it is executed regardless of the 'enable' value.")
     parser.add_argument("--view-config", action="store_true")
     parser.add_argument("--config-yaml-filename", default=root_dir / "recipe_crawler_config.yml", type=pathlib.Path)
     parser.add_argument("--work-dir", default=root_dir / ".work_recipes", type=pathlib.Path, help="working directory")
@@ -215,24 +215,21 @@ def main():
     # change_tag_evernote(args, evernote_cred)
 
     if args.sites is None or len(args.sites) == 0:
-        args.sites = [key for key in config.keys()]
+        args.sites = [key for key in config.keys() if config[key].get("enable", True)] # True if 'enable' is omitted
     
     for site in args.sites:
         if site in config and site in crawlers_map:
             site_config = config[site]
-            if site_config["enable"]:
-                crawler = crawlers_map[site]
-                crawler.init(args, site_config)
-                recipe_pickle_dir = crawler.cache_dir / "_pickle"
-                recipe_pickle_dir.mkdir(parents=True, exist_ok=True)
-                for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
-                    with crawler.processed_list_filename.open("a") as fp:
-                        fp.write("{}\n".format(recipe.id))
-                    
-                    store_local(recipe_pickle_dir, recipe)
-
-            else:
-                logger.warning("disable: {}".format(site))
+            
+            crawler = crawlers_map[site]
+            crawler.init(args, site_config)
+            recipe_pickle_dir = crawler.cache_dir / "_pickle"
+            recipe_pickle_dir.mkdir(parents=True, exist_ok=True)
+            for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
+                with crawler.processed_list_filename.open("a") as fp:
+                    fp.write("{}\n".format(recipe.id))
+                
+                store_local(recipe_pickle_dir, recipe)
         else:
             logger.warning("not exist: {}".format(site))
 

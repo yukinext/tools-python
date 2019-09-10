@@ -55,6 +55,12 @@ rsk_cooking_recipe:
     program_name: "RSK クッキング・レシピ"
     entry_urls:
         - "http://www.rsk.co.jp/tv/recipe/"
+tbs_obigohan:
+    enable: true
+    program_name: "TBS おびゴハン！"
+    is_expand_entry_urls: false
+    entry_urls:
+        - "https://www.tbs.co.jp/obigohan/calendar/"
 three_minutes_cooking:
     enable: true
     program_name: "NTV キューピー3分クッキング"

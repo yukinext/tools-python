@@ -84,7 +84,7 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 continue
             
             if not recipe_id in recipes:
-                logger.warn("{}: not exists in overview. skip recipe id: {}".foramt(self.__class__.site_name, recipe_id))
+                logger.warn("{}: not exists in overview. skip recipe id: {}".format(self.__class__.site_name, recipe_id))
                 continue
             
             try:
