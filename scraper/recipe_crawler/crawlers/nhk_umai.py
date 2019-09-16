@@ -57,7 +57,7 @@ class NhkUmaiRecipeCrawler(bases.RecipeCrawlerTemplate):
         cooking_name_nodes = detail_soup.find_all("h4")
         for cooking_name_node in cooking_name_nodes:
             recipe = copy.deepcopy(overview_recipe)
-            recipe.cooking_name = cooking_name_node.text
+            recipe.cooking_name = cooking_name_node.text.strip()
             recipe.image_urls = [urllib.parse.urljoin(recipe.detail_url, node["src"]) for node in cooking_name_node.parent.parent.select('img[src$="jpg"]')]
             
             cooking_string = get_cooking_string(cooking_name_node, cooking_name_nodes)
