@@ -1,5 +1,5 @@
 aibamanabu:
-    enable: false
+    enable: true
     program_name: "テレ朝 相葉マナブ"
     entry_urls:
         - "https://www.tv-asahi.co.jp/aibamanabu/recipe/"
