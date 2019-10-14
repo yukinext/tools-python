@@ -7,6 +7,7 @@ Created on Fri Aug 30 21:48:49 2019
 """
 
 from .bases import RecipeCrawlerTemplate
+from .aibamanabu import AibamanabuRecipeCrawler
 from .danshigohan import DanshigohanRecipeCrawler
 from .nhk_kamado import NhkKamadoRecipeCrawler
 from .nhk_kiichi import NhkKiichiRecipeCrawler
