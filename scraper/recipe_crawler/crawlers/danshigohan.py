@@ -35,18 +35,25 @@ class DanshigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
         """
         must deepcopy "recipe" before use
         """
-        recipe = copy.deepcopy(overview_recipe)
+        h6s = detail_soup.find_all("h6")
+        threshold_len = int(len(h6s)/2)
+        material_title_nodes = h6s[0:threshold_len]
+        recipe_steps_title_nodes = h6s[threshold_len:]
 
-        recipe.image_urls.append(detail_soup.find("div", "common_contents_box_mini").img["src"])
+        for i, (material_title_node, recipe_steps_title_node) in enumerate(zip(material_title_nodes, recipe_steps_title_nodes)):
+            recipe = copy.deepcopy(overview_recipe)
+    
+            recipe.image_urls.append(detail_soup.find("div", "common_contents_box_mini").img["src"])
 
-        material_title_node, recipe_steps_title_node = detail_soup.find_all("h6")
-        material_title = material_title_node.text.replace("材料", "").strip()
-        if material_title:
-            recipe.materials.append(RecipeText(material_title))
-        for material in material_title_node.find_next_sibling("ul").find_all("li"):
-            recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("span")])))
-
-        for recipe_step in recipe_steps_title_node.find_next_sibling("ul").find_all("li"):
-            recipe.recipe_steps.append(RecipeText(recipe_step.text.strip()))
-        
-        yield recipe
+            material_title = material_title_node.text.replace("材料", "").strip()
+            if material_title:
+                if i:
+                    recipe.cooking_name = "%s / %s" % (recipe.cooking_name, material_title)
+                recipe.materials.append(RecipeText(material_title))
+            for material in material_title_node.find_next_sibling("ul").find_all("li"):
+                recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("span")])))
+    
+            for recipe_step in recipe_steps_title_node.find_next_sibling("ul").find_all("li"):
+                recipe.recipe_steps.append(RecipeText(recipe_step.text.strip()))
+            
+            yield recipe
