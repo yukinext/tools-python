@@ -53,7 +53,7 @@ class DanshigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
             for material in material_title_node.find_next_sibling("ul").find_all("li"):
                 recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("span")])))
     
-            for recipe_step in recipe_steps_title_node.find_next_sibling("ul").find_all("li"):
-                recipe.recipe_steps.append(RecipeText(recipe_step.text.strip()))
+            for j, recipe_step in enumerate(recipe_steps_title_node.find_next_sibling("ul").find_all("li")):
+                recipe.recipe_steps.append(RecipeText("（{}）{}".format(j + 1, recipe_step.text.strip())))
             
             yield recipe
