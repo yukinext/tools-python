@@ -12,6 +12,7 @@ import re
 import dateutil
 import logging
 import copy
+import urllib
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class DanshigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
         for i, (material_title_node, recipe_steps_title_node) in enumerate(zip(material_title_nodes, recipe_steps_title_nodes)):
             recipe = copy.deepcopy(overview_recipe)
     
-            recipe.image_urls.append(detail_soup.find("div", "common_contents_box_mini").img["src"])
+            recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("div", "common_contents_box_mini").img["src"]))
 
             material_title = material_title_node.text.replace("材料", "").strip()
             if material_title:
