@@ -86,7 +86,7 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
             buf = None
             is_recipe_step_area = False
             for l in lines:
-                if -1 < l.find("軒目"):
+                if -1 < l.find("軒目") or re.match(r"^[①-⑳＊].*『.*』", l.strip()):
                     if buf:
                         ret.append(buf)
                     buf = l.strip()
@@ -96,16 +96,16 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
                     is_recipe_step_area = False
 
                 if -1 < l.find("材料"):
-                    title, materials = re.match("(材料)(.*)", l.strip()).groups()
+                    title, materials = re.search("(材料)(.*)", l.strip()).groups()
                     # buf += "\n" + "\n".join(l.strip().split(None, 1))
-                    buf += "\n" + title + "\n" + materials.strip()
+                    buf += "\n" + title + "\n" + materials.strip() if materials else ""
                     continue
                 
                 if -1 < l.find("作り方"):
                     is_recipe_step_area = True
-                    title, recipe_steps = re.match("(作り方)(.*)", l.strip()).groups()
+                    title, recipe_steps = re.search("(作り方)(.*)", l.strip()).groups()
                     # buf += "\n" + "\n".join(l.strip().split(None, 1))
-                    buf += "\n" + title + "\n" + recipe_steps.strip()
+                    buf += "\n" + title + "\n" + recipe_steps.strip() if recipe_steps else ""
                     continue
                 
                 if buf:
@@ -135,7 +135,7 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
 
         logger.debug("-" * 20)
         logger.debug(cooking_shop_strings)
-        
+
         for shop_string in cooking_shop_strings:
  
             recipe_shop = None
@@ -146,13 +146,18 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
                 if len(l.strip()) == 0:
                     continue
                 
-                if -1 < l.find("軒目"):
+                if -1 < l.find("軒目") or re.match(r"^[①-⑳＊].*『.*』", l.strip()):
                     recipe_shop = copy.deepcopy(overview_recipe)
                     recipe = None
 
-                    m = re.search("「(.*)」", l)
+                    m = re.search(r"「(.*)」", l)
                     if m:
                         recipe_shop.cooking_name_sub += "/" + m.group(1)
+                    else:
+                        m2 = re.search(r"『(.*)』", l)
+                        if m2:
+                            recipe_shop.cooking_name_sub += "/" + m2.group(1)
+                            
                     continue
                 
                 if -1 < l.find("料理"):
@@ -165,8 +170,12 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
                         recipe = copy.deepcopy(recipe_shop)
                     else:
                         recipe = copy.deepcopy(overview_recipe)
-                    
-                    recipe.cooking_name = l.split("：")[1].strip()
+                    if -1 < l.find(":"):
+                        recipe.cooking_name = l.split(":")[1].strip()
+                    elif -1 < l.find("："):
+                        recipe.cooking_name = l.split("：")[1].strip()
+                    else:
+                        recipe.cooking_name = l.split(None, 1)[1].strip()
                     continue
                 
                 if -1 < l.find("材料"):
