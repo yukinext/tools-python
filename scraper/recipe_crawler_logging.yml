@@ -21,3 +21,8 @@ handlers:
 formatters:
     simple:
         format: "%(asctime)s [%(levelname)s] %(message)s"
+loggers:
+    pdfminer:
+        level: ERROR
+        handlers:
+            - StreamHandler
