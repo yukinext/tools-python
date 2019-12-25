@@ -1,0 +1,23 @@
+version: 1
+disable_existing_loggers: false
+root:
+    level: DEBUG
+    handlers:
+        - TimedRotatingFileHandler
+        - StreamHandler
+handlers:
+    TimedRotatingFileHandler:
+        class: logging.handlers.TimedRotatingFileHandler
+        filename: "./logs/main.log"
+        when: "midnight"
+        interval: 1
+        backupCount: 31
+        level: DEBUG
+        formatter: simple
+    StreamHandler:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: simple
+formatters:
+    simple:
+        format: "%(asctime)s [%(levelname)s] %(message)s"

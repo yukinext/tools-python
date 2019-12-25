@@ -33,12 +33,12 @@ import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 urllib3.disable_warnings(InsecureRequestWarning)
 
-logging.config.fileConfig('recipe_crawler_logging.config', disable_existing_loggers=False)
-logger = logging.getLogger(__name__)
-
 yaml.add_representer(collections.OrderedDict, lambda dumper, instance: dumper.represent_mapping('tag:yaml.org,2002:map', instance.items()))
 yaml.add_representer(type(None), lambda dumper, instance: dumper.represent_scalar('tag:yaml.org,2002:null', "~"))
 yaml.add_constructor('tag:yaml.org,2002:map', lambda loader, node: collections.OrderedDict(loader.construct_pairs(node)))
+
+logging.config.dictConfig(yaml.safe_load(pathlib.Path('recipe_crawler_logging.yml').open("r").read()))
+logger = logging.getLogger(__name__)
 
         
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
