@@ -90,9 +90,8 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
             try:
                 logger.info("{}: start : {}".format(self.__class__.site_name, recipe_id))
                 content = target_fn.open("rb").read()
-                soup = BeautifulSoup(content, "html5lib", from_encoding=chardet.detect(content)["encoding"])
-                
-                for detail_recipe in self._recipe_details_generator(soup, recipes[recipe_id]):
+                converted_content = self._convert_detail_content(content)
+                for detail_recipe in self._recipe_details_generator(converted_content, recipes[recipe_id]):
                     yield detail_recipe
                 
             except AttributeError:
@@ -115,6 +114,10 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
         if to_path.exists():
             return self._get_new_fn(from_path, prefix_mark, prefix_times + 1)
         return to_path
+
+    def _convert_detail_content(self, raw_content):
+        return BeautifulSoup(raw_content, "html5lib", from_encoding=chardet.detect(raw_content)["encoding"])
+        
 
     def _trans_to_recipe_id_from_str(self, target_id_str):
         return int(target_id_str)

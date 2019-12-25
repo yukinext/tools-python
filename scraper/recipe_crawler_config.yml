@@ -29,6 +29,11 @@ nhk_kobara_ta:
     entry_urls:
         - "https://www4.nhk.or.jp/P4131/22/"
         - "https://www4.nhk.or.jp/P4131/23/"
+nhk_noukameshi:
+    enable: true
+    program_name: "NHK 梅沢富美男と東野幸治のまんぷく農家メシ！"
+    entry_urls:
+        - "https://www4.nhk.or.jp/manpuku/25/"
 nhk_umai:
     enable: true
     program_name: "NHK うまいッ！"
