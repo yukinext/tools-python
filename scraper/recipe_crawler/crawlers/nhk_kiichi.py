@@ -19,21 +19,46 @@ logger = logging.getLogger(__name__)
 class NhkKiichiRecipeCrawler(bases.RecipeCrawlerTemplate):
     site_name = "nhk_kiichi"
 
+    def _trans_to_recipe_id_from_str(self, target_id_str):
+        return target_id_str
+
+    def _sortkey_cache_filename(self, target_fn):
+        return target_fn.stem
+
+    def _is_valid_cache_filename(self, target_fn):
+        return True
+
+    def _get_recipe_id_from_cache_file(self, target_fn):
+        return target_fn.stem
+
     def _get_recipe_overviews(self, overview_soup, entry_url):
         recipes = dict() # key: Recipe.id, value: Recipe
-        items = iter(overview_soup.find_all("section")[1:-1])
+        items = overview_soup.select("section,hr")[1:-1]
+        
+        subtitle_node = None
+        title_node = None
+        title_node_counter = 0
         for item in items:
-            if item.h2 is None:
+            if item.name == "hr":
+                subtitle_node = None
+                title_node = None
+                title_node_counter = 0
                 continue
-            subtitle_node = item
-            title_node = next(items)
+            if subtitle_node is None:
+                subtitle_node = item
+                continue
+            else:
+                title_node = item
+                title_node_counter += 1
+
             recipe = Recipe()
             recipe.detail_url = entry_url
             recipe.cooking_name = title_node.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
             recipe.cooking_name_sub = subtitle_node.h2.text.strip()
             recipe.program_name = self.program_name
             recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
-            recipe.image_urls.append(urllib.parse.urljoin(entry_url, title_node.img["src"]))
+            if title_node.img:
+                recipe.image_urls.append(urllib.parse.urljoin(entry_url, title_node.img["src"]))
             
             is_material_area = False
             is_recipe_step_area = False
@@ -61,7 +86,9 @@ class NhkKiichiRecipeCrawler(bases.RecipeCrawlerTemplate):
                     recipe.recipe_steps.append(RecipeText(l))
                     
             # recipe.id = hashlib.md5("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name).encode("utf-8")).hexdigest()            
-            recipe.id = int("{:%Y%m%d}".format(recipe.program_date))
+            recipe.id = "{:%Y%m%d}".format(recipe.program_date)
+            if 1 < title_node_counter:
+                recipe.id += "_{}".format(title_node_counter)
             recipes[recipe.id] = recipe
 
         return recipes
