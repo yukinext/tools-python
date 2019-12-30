@@ -38,7 +38,7 @@ class KtvNijiiroRecipeCrawler(bases.RecipeCrawlerTemplate):
         ret = set()
         entry_url_base = self.entry_urls[0]
         base = datetime.date.today()
-        for d in range(0, 50):
+        for d in range(0, 5):
             offset = -1 - d
             target = base + dateutil.relativedelta.relativedelta(weekday=dateutil.relativedelta.SA(offset))
             ret.add(urllib.parse.urljoin(entry_url_base, "/niji/{:%y%m%d}.html".format(target)))
