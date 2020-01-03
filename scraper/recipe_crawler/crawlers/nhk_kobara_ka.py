@@ -14,6 +14,7 @@ import logging
 import dateutil
 import copy
 import hashlib
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,10 @@ class NhkKobaraSuitemasenkaRecipeCrawler(bases.RecipeCrawlerTemplate):
                     elif is_recipe_step_area:
                         recipe.recipe_steps.append(RecipeText(l))
                         
+                if not recipe.program_date < datetime.datetime.now():
+                    logger.info("{} is invalid date".format(recipe.program_date))
+                    continue
+
                 recipe.id = "{:%Y%m%d}_{}".format(recipe.program_date, hashlib.md5(("{}/{}".format(recipe.cooking_name_sub, recipe.cooking_name) if recipe.cooking_name_sub else recipe.cooking_name).encode("utf-8")).hexdigest())
                 recipes[recipe.id] = recipe
 
