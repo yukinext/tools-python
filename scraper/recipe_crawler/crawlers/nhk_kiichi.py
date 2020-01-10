@@ -54,7 +54,8 @@ class NhkKiichiRecipeCrawler(bases.RecipeCrawlerTemplate):
 
             recipe = Recipe()
             recipe.detail_url = entry_url
-            recipe.cooking_name = title_node.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
+            recipe.cooking_name = (title_node.h2 if title_node.h2 else title_node.p).text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip() # 2020.01.10
+            # recipe.cooking_name = title_node.h2.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
             recipe.cooking_name_sub = subtitle_node.h2.text.strip()
             recipe.program_name = self.program_name
             recipe.program_date = dateutil.parser.parse("{}/{}".format(*re.search("(\d+)\D+(\d+)\D+", recipe.cooking_name_sub).groups()))
