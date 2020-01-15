@@ -174,6 +174,10 @@ class NhkNoukameshiRecipeCrawler(bases.RecipeCrawlerTemplate):
                         recipe.cooking_name = l.split(":")[1].strip()
                     elif -1 < l.find("："):
                         recipe.cooking_name = l.split("：")[1].strip()
+                    elif re.search(r"^料理[①-⑳]", l.strip()):
+                        # https://www.nhk.or.jp/program/manpuku/recipe/dg0_200115.pdf
+                        # 料理①カルパッチョ
+                        recipe.cooking_name = l.strip()[3:].strip()
                     else:
                         recipe.cooking_name = l.split(None, 1)[1].strip()
                     continue
