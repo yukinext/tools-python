@@ -61,17 +61,14 @@ class DanshigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
             recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("div", "common_contents_box_mini").img["src"]))
 
             material_title = material_title_node.text.replace("材料", "").strip()
-            print("1")
             if material_title:
                 if i:
                     recipe.cooking_name = "%s / %s" % (recipe.cooking_name, material_title)
                 recipe.materials.append(RecipeText(material_title))
-            print("2")
             for material in material_title_node.find_next_sibling("ul").find_all("li"):
                 recipe.materials.append(RecipeText(": ".join([m.text for m in material.find_all("span")])))
     
             for j, recipe_step in enumerate(recipe_steps_title_node.find_next_sibling("ul").find_all("li")):
                 recipe.recipe_steps.append(RecipeText("（{}）{}".format(j + 1, recipe_step.text.strip())))
-            print("3")
             
             yield recipe
