@@ -18,21 +18,35 @@ import logging.config
 import re
 import sys
 
-DEFAULT_URL_ROOT = "https://www.tv-asahi.co.jp/goodmorning/uranai/sphone/"
+DEFAULT_URL_ROOT = "https://www.tv-asahi.co.jp/goodmorning/uranai/"
+MAP_PAGE_CONS_ID = {
+        "#ohitsuji":0,
+        "#ousi":1,
+        "#futago":2,
+        "#kani":3,
+        "#sisi":4,
+        "#otome":5,
+        "#tenbin":6,
+        "#sasori":7,
+        "#ite":8,
+        "#yagi":9,
+        "#mizugame":10,
+        "#uo":11,        
+        }
 
 MAP_PAGE_CONS = {
-        1:"おひつじ座",
-        2:"おうし座",
-        3:"ふたご座",
-        4:"かに座",
-        5:"しし座",
-        6:"おとめ座",
-        7:"てんびん座",
-        8:"さそり座",
-        9:"いて座",
-        10:"やぎ座",
-        11:"みずがめ座",
-        12:"うお座",
+        0:"おひつじ座",
+        1:"おうし座",
+        2:"ふたご座",
+        3:"かに座",
+        4:"しし座",
+        5:"おとめ座",
+        6:"てんびん座",
+        7:"さそり座",
+        8:"いて座",
+        9:"やぎ座",
+        10:"みずがめ座",
+        11:"うお座",
         }
 
 logging.config.dictConfig({
@@ -60,8 +74,9 @@ logging.config.dictConfig({
 logger = logging.getLogger()
 
 class ConstellationInfo(object):
-    def __init__(self, cons_id, name, rank):
+    def __init__(self, cons_id, cons_id_name, name, rank):
         self.cons_id = cons_id
+        self.cons_id_name = cons_id_name
         self.name = name
         self.rank = rank
         self.advice = ""
@@ -77,7 +92,7 @@ class ConstellationInfo(object):
         return "<%s: {%s}>" % (self.__class__.__name__, ', '.join(items))  
 
 def get_target_date(bs):
-    t = bs.select_one(".wood-area").get_text().strip()
+    t = bs.select_one("#ranking").p.get_text().strip()
     m = re.match(r"(?P<month>\d+)\D+(?P<day>\d+)\D+.*", t)
     today = datetime.date.today()
     
@@ -112,25 +127,20 @@ def main():
     target_date = get_target_date(bs)
     
     for i, a in enumerate(bs.ul.find_all("a")):
-        cons_id, _ = a["href"].split(".")
-        cons_id = int(cons_id)
-        infos[cons_id] = (ConstellationInfo(cons_id, MAP_PAGE_CONS[cons_id], i + 1))
+        cons_id_name = a["href"]
+        cons_id = MAP_PAGE_CONS_ID[cons_id_name]
+        infos[cons_id] = (ConstellationInfo(cons_id, cons_id_name, MAP_PAGE_CONS[cons_id], i + 1))
  
     for info in infos.values():
-        url_detail = "%s%d.html" % (args.url_root, info.cons_id)
-        
-        logger.info("read: %s" % url_detail)
-        
-        res = requests.get(url_detail)
-        bs = BeautifulSoup(res.content, features="html.parser")
-        read_area = bs.find("div", "read-area")
+        soup = bs.select_one(info.cons_id_name)
+        read_area = soup.find("div", "read-area")
         info.advice = read_area.p.string.strip()
         _, info.lucky_color = read_area.select_one(".lucky-color-txt").next_sibling.strip().split("：")
         _, info.lucky_item = read_area.select_one(".key-txt").next_sibling.strip().split("：")
-        info.fortune_economic = len(bs.select_one(".lukey-money").select(".icon-money"))   
-        info.fortune_love = len(bs.select_one(".lukey-love").select(".icon-money"))   
-        info.fortune_work = len(bs.select_one(".lukey-work").select(".icon-money"))   
-        info.fortune_health = len(bs.select_one(".lukey-health").select(".icon-money"))   
+        info.fortune_economic = len(soup.select_one(".lucky-money").select(".icon-money"))   
+        info.fortune_love = len(soup.select_one(".lucky-love").select(".icon-love"))   
+        info.fortune_work = len(soup.select_one(".lucky-work").select(".icon-work"))   
+        info.fortune_health = len(soup.select_one(".lucky-health").select(".icon-health"))   
     
         logger.info(info)
     
