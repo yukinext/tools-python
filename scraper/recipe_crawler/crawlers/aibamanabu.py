@@ -21,15 +21,17 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
 
     def _get_recipe_overviews(self, overview_soup, entry_url):
         recipes = dict() # key: Recipe.id, value: Recipe
-        for item in overview_soup.find("div", "wlist").find_all("dd"):
-            recipe = Recipe()
-            recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
-            recipe.id = int(re.search(r".*/(\d+)/", recipe.detail_url).group(1))
-            program_date_str, cooking_name_sub = item.get_text("\n").split(maxsplit=1)
-            recipe.cooking_name_sub = cooking_name_sub
-            recipe.program_name = self.program_name
-            recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str).groups()])
-            recipes[recipe.id] = recipe
+        wlist = overview_soup.find("div", "wlist")
+        if wlist:
+            for item in wlist.find_all("dd"):
+                recipe = Recipe()
+                recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
+                recipe.id = int(re.search(r".*/(\d+)/", recipe.detail_url).group(1))
+                program_date_str, cooking_name_sub = item.get_text("\n").split(maxsplit=1)
+                recipe.cooking_name_sub = cooking_name_sub
+                recipe.program_name = self.program_name
+                recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str).groups()])
+                recipes[recipe.id] = recipe
 
         return recipes
     
