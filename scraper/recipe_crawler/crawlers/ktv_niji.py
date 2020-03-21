@@ -46,7 +46,7 @@ class KtvNijiiroRecipeCrawler(bases.RecipeCrawlerTemplate):
         return ret
 
     def _get_recipe_overviews(self, overview_soup, entry_url):
-        recipe_title_node = overview_soup.find("h2", text="レシピ")
+        recipe_title_node = overview_soup.find("h2", text=re.compile(r"レシピ.*"))
         if recipe_title_node is None:
             logger.info("{} have no recipe.".format(entry_url))
             return dict()
