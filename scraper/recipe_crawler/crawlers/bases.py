@@ -50,8 +50,8 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
         for entry_url in self.entry_urls:
             res = requests.get(entry_url, verify=False)
             if res.ok:
-                soup = BeautifulSoup(res.content, "html5lib", from_encoding=res.apparent_encoding)
-                recipes.update(self._get_recipe_overviews(soup, entry_url))
+                converted_overview_content = self._convert_overview_content(res.content)
+                recipes.update(self._get_recipe_overviews(converted_overview_content, entry_url))
 
         processed_recipe_ids = set()
             
@@ -114,6 +114,9 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
         if to_path.exists():
             return self._get_new_fn(from_path, prefix_mark, prefix_times + 1)
         return to_path
+
+    def _convert_overview_content(self, raw_content):
+        return BeautifulSoup(raw_content, "html5lib", from_encoding=chardet.detect(raw_content)["encoding"])
 
     def _convert_detail_content(self, raw_content):
         return BeautifulSoup(raw_content, "html5lib", from_encoding=chardet.detect(raw_content)["encoding"])

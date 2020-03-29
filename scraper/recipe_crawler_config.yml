@@ -2,7 +2,7 @@ aibamanabu:
     enable: true
     program_name: "テレ朝 相葉マナブ"
     entry_urls:
-        - "https://www.tv-asahi.co.jp/aibamanabu/recipe/"
+        - "https://www.tv-asahi.co.jp/aibamanabu/recipe/json-list/api/recipe-list.json"
 danshigohan:
     enable: true
     program_name: "テレ東 男子ごはん"
