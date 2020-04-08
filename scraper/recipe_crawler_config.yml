@@ -9,7 +9,7 @@ danshigohan:
     entry_urls:
         - "https://www.tv-tokyo.co.jp/danshigohan/recipe/"
 ktv_niji:
-    enable: true
+    enable: false
     program_name: "KTV にじいろジーン"
     is_expand_entry_urls: true
     entry_urls:
@@ -36,10 +36,18 @@ nhk_kobara_ta:
         - "https://www4.nhk.or.jp/P4131/22/"
         - "https://www4.nhk.or.jp/P4131/23/"
 nhk_noukameshi:
-    enable: true
+    enable: false
     program_name: "NHK 梅沢富美男と東野幸治のまんぷく農家メシ！"
     entry_urls:
         - "https://www4.nhk.or.jp/manpuku/25/"
+nhk_noukameshi_2:
+    enable: true
+    program_name: "NHK 梅沢富美男と東野幸治のまんぷく農家メシ！"
+    entry_urls:
+        # - "https://www.nhk.jp/p/manpuku/ts/X8Y9NKXY43/list/"
+        - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=0&limit=10"
+        - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=10&limit=10"
+        - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=20&limit=10"
 nhk_umai:
     enable: true
     program_name: "NHK うまいッ！"

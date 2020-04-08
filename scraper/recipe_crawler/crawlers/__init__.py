@@ -14,6 +14,7 @@ from .nhk_kamado import NhkKamadoRecipeCrawler
 from .nhk_kiichi import NhkKiichiRecipeCrawler
 from .nhk_kobara_ka import NhkKobaraSuitemasenkaRecipeCrawler
 from .nhk_kobara_ta import NhkKobaraGaSukimashitaRecipeCrawler
+from .nhk_noukameshi_2 import NhkNoukameshi2RecipeCrawler
 from .nhk_noukameshi import NhkNoukameshiRecipeCrawler
 from .nhk_umai import NhkUmaiRecipeCrawler
 from .nikomaru import NikomaruKitchenRecipeCrawler
