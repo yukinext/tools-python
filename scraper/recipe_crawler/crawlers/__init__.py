@@ -12,6 +12,7 @@ from .danshigohan import DanshigohanRecipeCrawler
 from .ktv_niji import KtvNijiiroRecipeCrawler
 from .nhk_kamado import NhkKamadoRecipeCrawler
 from .nhk_kiichi import NhkKiichiRecipeCrawler
+from .nhk_kobara_ka_2 import NhkKobaraSuitemasenka2RecipeCrawler
 from .nhk_kobara_ka import NhkKobaraSuitemasenkaRecipeCrawler
 from .nhk_kobara_ta import NhkKobaraGaSukimashitaRecipeCrawler
 from .nhk_noukameshi_2 import NhkNoukameshi2RecipeCrawler

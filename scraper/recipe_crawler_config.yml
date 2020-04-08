@@ -25,10 +25,18 @@ nhk_kiichi:
     entry_urls:
         - "https://www4.nhk.or.jp/bscon/23/"
 nhk_kobara_ka:
-    enable: true
+    enable: false
     program_name: "NHK きじまりゅうたの小腹すいてませんか？"
     entry_urls:
         - "https://www4.nhk.or.jp/kobara/23/"
+nhk_kobara_ka_2:
+    enable: true
+    program_name: "NHK きじまりゅうたの小腹すいてませんか？"
+    entry_urls:
+        # - "https://www.nhk.jp/p/kobara/ts/9L67VX9RW1/list/"
+        - "https://api.nhk.jp/r6/sch/tvepisode/ts/9L67VX9RW1.json?offset=0&limit=10"
+        # - "https://api.nhk.jp/r6/sch/tvepisode/ts/9L67VX9RW1.json?offset=10&limit=10"
+        # - "https://api.nhk.jp/r6/sch/tvepisode/ts/9L67VX9RW1.json?offset=20&limit=10"
 nhk_kobara_ta:
     enable: true
     program_name: "NHK きじまりゅうたの小腹がすきました！"
