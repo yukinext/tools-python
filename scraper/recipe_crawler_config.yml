@@ -54,8 +54,8 @@ nhk_noukameshi_2:
     entry_urls:
         # - "https://www.nhk.jp/p/manpuku/ts/X8Y9NKXY43/list/"
         - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=0&limit=10"
-        - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=10&limit=10"
-        - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=20&limit=10"
+        # - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=10&limit=10"
+        # - "https://api.nhk.jp/r6/sch/tvepisode/ts/X8Y9NKXY43.json?offset=20&limit=10"
 nhk_umai:
     enable: true
     program_name: "NHK うまいッ！"
