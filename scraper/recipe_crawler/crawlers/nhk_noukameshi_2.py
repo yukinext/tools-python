@@ -68,7 +68,6 @@ class NhkNoukameshi2RecipeCrawler(bases.RecipeCrawlerTemplate):
         subtitle = None
         recipe = None
         is_recipe_step_area = False
-        recipe_counter = 0
         for line_ in recipe_title_node.parent.find_next_sibling("ul").text.replace("　", " ").splitlines():
             line_ = line_.strip()
             if len(line_) == 0:
@@ -92,8 +91,6 @@ class NhkNoukameshi2RecipeCrawler(bases.RecipeCrawlerTemplate):
                 recipe = copy.deepcopy(overview_recipe)
                 recipe.cooking_name = title
                 recipe.cooking_name_sub = "{}/{}".format(recipe.cooking_name_sub, subtitle)
-                recipe.id = "{}_{}".format(recipe.id, recipe_counter)
-                recipe_counter += 1
                 continue
             
             m_material = re.match(r"材料\s*(.*)", line_)
