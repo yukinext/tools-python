@@ -11,6 +11,7 @@ from recipe_crawler.models import Recipe, RecipeText
 import re
 import logging
 import dateutil
+import datetime
 import json
 import chardet
 import copy
@@ -48,6 +49,12 @@ class NhkKobaraSuitemasenka2RecipeCrawler(bases.RecipeCrawlerTemplate):
                     program_date_str = be["identifierGroup"]["date"]
                     recipe.program_date = dateutil.parser.parse(program_date_str).date()
                     recipe.id = "{}_{}".format(program_date_str, item["id"])
+                    break
+
+            if not recipe.program_date < datetime.date.today():
+                logger.debug("{} is invalid date".format(recipe.program_date))
+                continue
+
             recipes[recipe.id] = recipe
         return recipes
     
@@ -57,43 +64,32 @@ class NhkKobaraSuitemasenka2RecipeCrawler(bases.RecipeCrawlerTemplate):
         """
         def get_recipe_areas(lines):
             recipe_areas = list()
-            recipe_area = None
-            for ii, line in enumerate(lines):
-                if ii == 0 or re.match(r"^「.*?」", line.strip()):
-                    recipe_area = list()
-                    recipe_areas.append(recipe_area)
-                recipe_area.append(line)
-            
-            # 1st line in recipe_area is cooking_name
+            # 1 recipe area in kobara sukimashita ka
+            recipe_areas.append(lines)
             return recipe_areas
         
-        
-        recipe_title_node = detail_soup.find("span", text=re.compile(r".*レシピ"))
-        if recipe_title_node is None:
-            return
-        
-        for recipe_area in get_recipe_areas(recipe_title_node.parent.find_next_sibling("ul").text.splitlines()):
-            recipe = copy.deepcopy(overview_recipe)
-            recipe.cooking_name = recipe_area[0].translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
-        
-            is_material_area = False
-            is_recipe_step_area = False
-            for l in recipe_area[1:]:
-                if len(l.strip()) == 0:
-                    continue
-                
-                if -1 < l.find("＜材料＞"):
-                    is_material_area = True
-                    recipe.materials.append(RecipeText(l.replace("＜材料＞", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO)))
-                    continue
-                if -1 < l.find("＜作り方＞"):
-                    is_material_area = False
-                    is_recipe_step_area = True
-                    continue
-                
-                if is_material_area:
-                    recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
-                elif is_recipe_step_area:
-                    recipe.recipe_steps.append(RecipeText(l))
-
-            yield recipe
+        for recipe_title_node in detail_soup.find_all("span", text=re.compile(r".*レシピ")):
+            for recipe_area in get_recipe_areas(recipe_title_node.parent.find_next_sibling("ul").text.splitlines()):
+                recipe = copy.deepcopy(overview_recipe)
+                recipe.cooking_name = recipe_title_node.text.replace("レシピ", "").strip()
+                is_material_area = False
+                is_recipe_step_area = False
+                for l in recipe_area:
+                    if len(l.strip()) == 0:
+                        continue
+                    
+                    if -1 < l.find("◎材料"):
+                        is_material_area = True
+                        recipe.materials.append(RecipeText(l.replace("◎材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO)))
+                        continue
+                    if -1 < l.find("◎作り方"):
+                        is_material_area = False
+                        is_recipe_step_area = True
+                        continue
+                    
+                    if is_material_area:
+                        recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
+                    elif is_recipe_step_area:
+                        recipe.recipe_steps.append(RecipeText(l))
+    
+                yield recipe

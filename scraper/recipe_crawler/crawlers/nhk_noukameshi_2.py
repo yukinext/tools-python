@@ -11,6 +11,7 @@ from recipe_crawler.models import Recipe, RecipeText
 import re
 import logging
 import dateutil
+import datetime
 import json
 import chardet
 import copy
@@ -48,6 +49,11 @@ class NhkNoukameshi2RecipeCrawler(bases.RecipeCrawlerTemplate):
                     program_date_str = be["identifierGroup"]["date"]
                     recipe.program_date = dateutil.parser.parse(program_date_str).date()
                     recipe.id = "{}_{}".format(program_date_str, item["id"])
+                    break
+                
+            if not recipe.program_date < datetime.date.today():
+                logger.debug("{} is invalid date".format(recipe.program_date))
+                continue
             recipes[recipe.id] = recipe
         return recipes
     
