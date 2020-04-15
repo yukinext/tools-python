@@ -67,19 +67,19 @@ class NhkNoukameshi2RecipeCrawler(bases.RecipeCrawlerTemplate):
                 return ": ".join(m.groups())
             return material_s
         
-        recipe_title_node = detail_soup.find("span", text=re.compile(r".*レシピは？"))
+        recipe_title_node = detail_soup.find("div", "headline", text=re.compile(r".*レシピ.*"))
         if recipe_title_node is None:
             return
         
         subtitle = None
         recipe = None
         is_recipe_step_area = False
-        for line_ in recipe_title_node.parent.find_next_sibling("ul").text.replace("　", " ").splitlines():
+        for line_ in recipe_title_node.find_next_sibling("ul").ul.text.replace("　", " ").splitlines():
             line_ = line_.strip()
             if len(line_) == 0:
                 continue
             
-            m_subtitle = re.match(r".*?軒目\s*「(.*?)」", line_)
+            m_subtitle = re.match(r".*?軒目\s*「(.*)」", line_)
             if m_subtitle:
                 if recipe:
                     yield recipe
@@ -88,7 +88,7 @@ class NhkNoukameshi2RecipeCrawler(bases.RecipeCrawlerTemplate):
                 is_recipe_step_area = False
                 continue
             
-            m_title = re.match(r"^料理.*?：(.*)", line_)
+            m_title = re.match(r"^料理.*?[①-⑩][：:]?(.*)", line_)
             if m_title:
                 if recipe:
                     yield recipe
