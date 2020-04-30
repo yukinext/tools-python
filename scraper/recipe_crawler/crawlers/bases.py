@@ -73,6 +73,7 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 logger.info(("{} " + message_current_max + ": get : {}").format(self.__class__.site_name, i + 1, recipes_num, recipe.id))
                 (self.cache_dir / str(recipe.id)).open("wb").write(res.content)
         # get detail recipe info
+        skipped_recipe_ids = set()
         for target_fn in sorted(self.cache_dir.glob("[!_|.*]*"), key=lambda k: self._sortkey_cache_filename(k)):
             if not self._is_valid_cache_filename(target_fn):
                 logger.debug("{}: skip file : {}".format(self.__class__.site_name, target_fn.name))
@@ -84,7 +85,8 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 continue
             
             if not recipe_id in recipes:
-                logger.warn("{}: not exists in overview. skip recipe id: {}".format(self.__class__.site_name, recipe_id))
+                skipped_recipe_ids.add(recipe_id)
+                logger.debug("{}: not exists in overview. skip recipe id: {}".format(self.__class__.site_name, recipe_id))
                 continue
             
             try:
@@ -100,6 +102,8 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 new_target_fn = self._get_new_fn(target_fn, "_", 1)
                 logger.info("{}: rename : {} -> {}".format(self.__class__.site_name, target_fn.name, new_target_fn.name))
                 target_fn.rename(new_target_fn)
+        if len(skipped_recipe_ids):
+            logger.warn("{}: not exists in overview. skip recipe id(s): {}".format(self.__class__.site_name, ",".join(skipped_recipe_ids)))
     
     def _expand_entry_urls(self):
         return self.entry_urls
