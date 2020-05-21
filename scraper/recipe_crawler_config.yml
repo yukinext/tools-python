@@ -20,7 +20,7 @@ nhk_kamado:
     entry_urls:
         - "https://www.nhk.or.jp/kamado/recipe.html"
 nhk_kiichi:
-    enable: true
+    enable: false
     program_name: "NHK BSコンシェルジュ 板長稲塚の割烹Kiichiへようこそ"
     entry_urls:
         - "https://www4.nhk.or.jp/bscon/23/"
