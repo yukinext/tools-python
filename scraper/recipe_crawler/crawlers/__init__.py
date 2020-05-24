@@ -24,5 +24,6 @@ from .oshaberi import OshaberiRecipeCrawler
 from .rsk_cooking_recipe import RskCookingRecipeRecipeCrawler
 from .tbs_obigohan import TbsObigohanRecipeCrawler
 from .three_min_cooking import ThreeMinCookingRecipeCrawler
+from .three_min_cooking_2 import ThreeMinCooking2RecipeCrawler
 from .tsc_grandmother_kitchen import TscGrandmotherKitchenRecipeCrawler
 # from . import *

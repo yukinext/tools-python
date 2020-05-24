@@ -94,10 +94,15 @@ tbs_obigohan:
     entry_urls:
         - "https://www.tbs.co.jp/obigohan/calendar/"
 three_minutes_cooking:
-    enable: true
+    enable: false
     program_name: "NTV キューピー3分クッキング"
     entry_urls:
         - "http://www.ntv.co.jp/3min/airdate/"
+three_minutes_cooking_2:
+    enable: true
+    program_name: "NTV キューピー3分クッキング"
+    entry_urls:
+        - "https://www.ntv.co.jp/3min/airdate/"
 tsc_grandmother_kitchen:
     enable: true
     program_name: "TSC おばあちゃんの台所"
