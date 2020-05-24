@@ -57,7 +57,7 @@ class EvernoteTranslator(object):
     <li>
         {%- set recipe_step_ls = recipe_step.text.splitlines() %}
         {%- for recipe_step_l in recipe_step_ls %}
-        <div>{{ recipe_step_l }}</div>
+        <div><p>{{ recipe_step_l }}</p></div>
         {%- endfor %}
 {%- for image_url in recipe_step.image_urls %}
         <br /><en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" />
