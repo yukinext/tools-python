@@ -250,17 +250,20 @@ def main():
             if args.use_local:
                 logger.info("store local enex")
                 enexs = list()
+                processed_recipes = list()
                 for recipe, (enex_title, enex) in create_enex(crawler.process, args, site_config):
                     store_local(recipe_pickle_dir, recipe)
                     enexs.append(enex)
+                    processed_recipes.append(recipe)
                 
                 enex_dir = args.work_dir / "_enex"
                 enex_dir.mkdir(parents=True, exist_ok=True)
 
                 store_local_enex(enex_dir, site_config["program_name"], enexs)
 
-                with crawler.processed_list_filename.open("a") as fp:
-                    fp.write("{}\n".format(recipe.id))
+                for proecssed_recipe in processed_recipes:
+                    with crawler.processed_list_filename.open("a") as fp:
+                        fp.write("{}\n".format(proecssed_recipe.id))
             else:
                 for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
                     if recipe:
