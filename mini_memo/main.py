@@ -85,7 +85,7 @@ def proc_insert(args):
     store_filename = args.work_dir / args.store_file
     if store_filename.exists():
         with store_filename.open("r") as fp:
-            messages = yaml.load(fp)
+            messages = yaml.load(fp, Loader=yaml.Loader)
 
     today = datetime.date.today()
     if not today in messages:

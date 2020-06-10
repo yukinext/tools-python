@@ -40,11 +40,26 @@ yaml.add_constructor('tag:yaml.org,2002:map', lambda loader, node: collections.O
 logging.config.dictConfig(yaml.safe_load(pathlib.Path('recipe_crawler_logging.yml').open("r").read()))
 logger = logging.getLogger(__name__)
 
-        
+def store_evernote_localenex(recipes, args, site_config):
+
+    for recipe in recipes():
+        trans = recipe_crawler.translators.EvernoteLocalEnexTranslator(recipe, site_config)
+            
+        yield recipe, trans.enex
+    
+
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
-    note_store = client.get_note_store()
+    note_store = None
+    try:
+        note_store = client.get_note_store()
+    except:
+        logger.error(sys.exc_info()[0])
     
+    if note_store is None:
+        logger.error("note store in Evernote is None")
+        return
+
     notebook_name = evernote_cred["notebook_name"]
     notebooks = note_store.listNotebooks()
     target_notebook = None
@@ -146,6 +161,10 @@ def store_local(store_dirname, recipe):
     with pickle_filename.open("wb") as fp:
         pickle.dump(recipes, fp)
 
+def store_local_enex(store_dirname, recipe, title, enex):
+    output_filename = store_dirname / "{}.enex".format(title)
+    output_filename.write_text(enex)
+
 def _get_evernote_credential(credential_json_filename):
     if not credential_json_filename.exists():
         logger.debug("credential file not found: {}".format(credential_json_filename))
@@ -183,6 +202,7 @@ def main():
     parser.add_argument("--credential-json-filename", default=root_dir / "recipe_crawler_cred.json", type=pathlib.Path)
     parser.add_argument("--no-check-existed-note", action="store_true", help="no check existed notes and append new note. if do not check existed note and skip.")
     parser.add_argument("--processed-list-filename-postfix", default="_processed_data.txt")
+    parser.add_argument("--use-local", action="store_true", help="store local enex file. do not sync cloud evernote")
 
     args = parser.parse_args()
     args.work_dir.mkdir(parents=True, exist_ok=True)
@@ -225,11 +245,25 @@ def main():
             crawler.init(args, site_config)
             recipe_pickle_dir = crawler.cache_dir / "_pickle"
             recipe_pickle_dir.mkdir(parents=True, exist_ok=True)
-            for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
-                with crawler.processed_list_filename.open("a") as fp:
-                    fp.write("{}\n".format(recipe.id))
-                
-                store_local(recipe_pickle_dir, recipe)
+            
+            if args.use_local:
+                logger.info("store local enex")
+                for recipe, (title, enex) in store_evernote_localenex(crawler.process, args, site_config):
+                    if recipe:
+                        enex_dir = args.work_dir / "_enex"
+                        enex_dir.mkdir(parents=True, exist_ok=True)
+                        store_local(recipe_pickle_dir, recipe)
+                        store_local_enex(enex_dir, recipe, title, enex)
+    
+                        with crawler.processed_list_filename.open("a") as fp:
+                            fp.write("{}\n".format(recipe.id))
+            else:
+                for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
+                    if recipe:
+                        with crawler.processed_list_filename.open("a") as fp:
+                            fp.write("{}\n".format(recipe.id))
+                        
+                        store_local(recipe_pickle_dir, recipe)
         else:
             logger.warning("not exist: {}".format(site))
 
