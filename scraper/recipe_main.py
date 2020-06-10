@@ -163,7 +163,7 @@ def store_local(store_dirname, recipe):
 
 def store_local_enex(store_dirname, program_title, enexs):
     merged_enex = recipe_crawler.translators.EvernoteLocalEnexTranslator.merge(enexs)
-    output_filename = store_dirname / "{}.{:%Y%m%d}.enex".format(program_title, datetime.datetime.now())
+    output_filename = store_dirname / "{}.{:%Y%m%d-%H%M}.enex".format(program_title, datetime.datetime.now())
     output_filename.write_text(merged_enex)
 
 def _get_evernote_credential(credential_json_filename):
@@ -258,8 +258,8 @@ def main():
                 
                 enex_dir = args.work_dir / "_enex"
                 enex_dir.mkdir(parents=True, exist_ok=True)
-
-                store_local_enex(enex_dir, site_config["program_name"], enexs)
+                if len(enexs):
+                    store_local_enex(enex_dir, site_config["program_name"], enexs)
 
                 for proecssed_recipe in processed_recipes:
                     with crawler.processed_list_filename.open("a") as fp:
