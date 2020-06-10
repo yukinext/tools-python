@@ -22,7 +22,14 @@ def bin_to_base64(b_data):
 class EvernoteLocalEnexTranslator(object):
     _template = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">
-<note><title>{{ note.title }}</title><content><![CDATA[{{ note.content }}]]></content>
+<en-export>
+{%- for enex_note in enex_notes %}
+{{ enex_note }}
+{%- endfor %}
+</en-export>
+"""
+    
+    _template_note = """<note><title>{{ note.title }}</title><content><![CDATA[{{ note.content }}]]></content>
 <created>{{ note.created }} </created><updated>{{ note.updated }}</updated>
 {%- for tag in note.tagNames %}
 <tag>{{ tag }}</tag>
@@ -49,12 +56,16 @@ class EvernoteLocalEnexTranslator(object):
 </resource-attributes>
 </resource>
 {%- endfor %}
-</node>
+</note>
 """
     def __init__(self, recipe, site_config):
         assert isinstance(recipe, recipe_crawler.models.Recipe)
         self.recipe = recipe
         self.site_config = site_config
+
+    @staticmethod
+    def merge(enexs):
+        return jinja2.Template(__class__._template).render(enex_notes=enexs)
 
     @property
     def enex(self):
@@ -70,7 +81,7 @@ class EvernoteLocalEnexTranslator(object):
         note.created = datetime.datetime.now().astimezone(pytz.timezone("UTC")).strftime("%Y%m%dT%H%M%SZ")
         note.updated = note.created
         
-        tmpl = jinja2.Template(self.__class__._template)
+        tmpl = jinja2.Template(self.__class__._template_note)
         
         tmpl.globals['bin_to_base64'] = bin_to_base64
         return note.title, tmpl.render(note=note)

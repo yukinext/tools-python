@@ -6,6 +6,7 @@ Created on Tue Aug  6 21:30:16 2019
 @author: yuki_next
 """
 import argparse
+import datetime
 import logging
 import logging.config
 import logging.handlers
@@ -40,13 +41,12 @@ yaml.add_constructor('tag:yaml.org,2002:map', lambda loader, node: collections.O
 logging.config.dictConfig(yaml.safe_load(pathlib.Path('recipe_crawler_logging.yml').open("r").read()))
 logger = logging.getLogger(__name__)
 
-def store_evernote_localenex(recipes, args, site_config):
+def create_enex(recipes, args, site_config):
 
     for recipe in recipes():
         trans = recipe_crawler.translators.EvernoteLocalEnexTranslator(recipe, site_config)
-            
+        
         yield recipe, trans.enex
-    
 
 def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_check=True):
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])
@@ -161,9 +161,10 @@ def store_local(store_dirname, recipe):
     with pickle_filename.open("wb") as fp:
         pickle.dump(recipes, fp)
 
-def store_local_enex(store_dirname, recipe, title, enex):
-    output_filename = store_dirname / "{}.enex".format(title)
-    output_filename.write_text(enex)
+def store_local_enex(store_dirname, program_title, enexs):
+    merged_enex = recipe_crawler.translators.EvernoteLocalEnexTranslator.merge(enexs)
+    output_filename = store_dirname / "{}.{:%Y%m%d}.enex".format(program_title, datetime.datetime.now())
+    output_filename.write_text(merged_enex)
 
 def _get_evernote_credential(credential_json_filename):
     if not credential_json_filename.exists():
@@ -248,15 +249,18 @@ def main():
             
             if args.use_local:
                 logger.info("store local enex")
-                for recipe, (title, enex) in store_evernote_localenex(crawler.process, args, site_config):
-                    if recipe:
-                        enex_dir = args.work_dir / "_enex"
-                        enex_dir.mkdir(parents=True, exist_ok=True)
-                        store_local(recipe_pickle_dir, recipe)
-                        store_local_enex(enex_dir, recipe, title, enex)
-    
-                        with crawler.processed_list_filename.open("a") as fp:
-                            fp.write("{}\n".format(recipe.id))
+                enexs = list()
+                for recipe, (enex_title, enex) in create_enex(crawler.process, args, site_config):
+                    store_local(recipe_pickle_dir, recipe)
+                    enexs.append(enex)
+                
+                enex_dir = args.work_dir / "_enex"
+                enex_dir.mkdir(parents=True, exist_ok=True)
+
+                store_local_enex(enex_dir, site_config["program_name"], enexs)
+
+                with crawler.processed_list_filename.open("a") as fp:
+                    fp.write("{}\n".format(recipe.id))
             else:
                 for recipe in store_evernote(crawler.process, args, site_config, evernote_cred, is_note_exist_check=not args.no_check_existed_note):
                     if recipe:
