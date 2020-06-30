@@ -80,25 +80,70 @@ class ThreeMinCooking2RecipeCrawler(bases.RecipeCrawlerTemplate):
         recipe.materials.extend([RecipeText(": ".join(li.text.split())) for li in material_title_node.parent.parent.select("h4,li")])
 
         for i, howto_item in enumerate(detail_soup.find_all("div", "howto-item")):
-            # for recipe_step in recipe_steps_title_node.parent.parent.find_all("li"):
             if i:
                 recipe.recipe_steps.append(RecipeText("")) # 空行
-            for recipe_step in howto_item.find_all("li"):
-                buf = ""
-                if i:
-                    buf = recipe_step.text.strip()
-                else:
-                    num, step = recipe_step.find_all("p")
-                    num = num.text.strip()
-                    if len(num):
-                        buf += "（{}）".format(num)
-                    buf += step.text.strip()
-                
-                image_urls = []
-                for img in recipe_step.find_all("img"):
+            if howto_item.find("div", "howto-child") is not None:
+                # https://www.ntv.co.jp/3min/recipe/20200704/
+                for recipe_item in howto_item.find_all("li"):
+                    for j, recipe_step in enumerate(recipe_item.find_all("div", "howto-group-inner")):
+                        buf = ""
+                        if j:
+                            num, step = re.search(r"【(\d+)】(.*)", recipe_step.text.strip()).groups()
+                            num = num.strip()
+                            if len(num):
+                                buf += "（{}）".format(num)
+                            buf += step.strip()
+                        else:
+                            buf = recipe_step.text.strip()
+                            
+                        image_urls = []
+                        for img in recipe_step.find_all("img"):
+                            image_urls.append(img["src"])
+                        
+                        recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+                                        
+                    for j, howto_memo_item in enumerate(recipe_item.find_all("div", "howto-memo-item")):
+                        if j:
+                            recipe.recipe_steps.append(RecipeText("")) # 空行
+                        buf = "（メモ）" + howto_memo_item.text.strip()
+                        
+                        image_urls = []
+                        for img in howto_memo_item.find_all("img"):
+                            if ("class" in img) and img["class"] != "howto-memo-icon":
+                                image_urls.append(img["src"])
+                        
+                        recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+            else:
+                # for recipe_step in recipe_steps_title_node.parent.parent.find_all("li"):
+                for recipe_step in howto_item.find_all("li"):
+                    buf = ""
+                    if i:
+                        buf = recipe_step.text.strip()
+                    else:
+                        num, step = recipe_step.find_all("p")
+                        num = num.text.strip()
+                        if len(num):
+                            buf += "（{}）".format(num)
+                        buf += step.text.strip()
+                    
+                    image_urls = []
+                    for img in recipe_step.find_all("img"):
+                        image_urls.append(img["src"])
+                    
+                    recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+
+        for i, points_item in enumerate(detail_soup.find_all("div", "points-item")):
+            if i:
+                recipe.recipe_steps.append(RecipeText("")) # 空行
+            buf = "（ポイント）" + points_item.text.strip()
+            
+            image_urls = []
+            for img in points_item.find_all("img"):
+                if ("class" in img) and img["class"] != "points-icon":
                     image_urls.append(img["src"])
-                
-                recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+            
+            recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
+
         
         for advice in advice_title_node.parent.parent.find_all("li"):
             recipe.important_points.append(RecipeText(advice.text.strip()))
