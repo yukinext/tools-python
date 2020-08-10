@@ -120,10 +120,15 @@ class ThreeMinCooking2RecipeCrawler(bases.RecipeCrawlerTemplate):
                     if i:
                         buf = recipe_step.text.strip()
                     else:
-                        num, step = recipe_step.find_all("p")
-                        num = num.text.strip()
-                        if len(num):
-                            buf += "（{}）".format(num)
+                        ps = recipe_step.find_all("p")
+                        if len(ps) == 2:
+                            num, step = ps
+                            num = num.text.strip()
+                            if len(num):
+                                buf += "（{}）".format(num)
+                        else:
+                            # https://www.ntv.co.jp/3min/recipe/20200812/ :no num parts
+                            step = ps[0]
                         buf += step.text.strip()
                     
                     image_urls = []
