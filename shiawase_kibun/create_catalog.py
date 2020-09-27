@@ -19,6 +19,10 @@ import sys
 import urllib
 import time
 
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+urllib3.disable_warnings(InsecureRequestWarning)
+
 DEFAULT_URL_INDEX = "http://www.rnc.co.jp/tv/siawase/?page_id=100"
 DEFAULT_URL_DETAIL_PAGE = "http://www.rnc.co.jp/tv/siawase/?p={page_id:d}"
 DEFAULT_FILENAME_DETAIL = "{:06d}.html"
