@@ -10,6 +10,7 @@ import argparse
 import pathlib
 import bs4
 import re
+import html
 
 
 class Folder(object):
@@ -20,6 +21,12 @@ class Folder(object):
         self.last_modified = last_modified
         self.personal_toolbar_folder = personal_toolbar_folder
         self.contents = []
+
+    @property
+    def absolute_name(self):
+        if self.parent:
+            return f"{self.parent.absolute_name}/{self.name}"
+        return ""
 
     def add(self, node):
         self.contents.append(node)
@@ -33,7 +40,7 @@ class Folder(object):
         attribute = ' '.join(f'{k}="{v}"' for (k, v) in attributes.items() if v is not None)
         ret = []
         if self.parent:
-            ret.append(f"{indent_char * depth}<DT><H3 {attribute}>{self.name}</H3>")
+            ret.append(f"{indent_char * depth}<DT><H3 {attribute}>{html.escape(self.name).replace('&#x27;', '&#39;')}</H3>")
         ret.append(f"{indent_char * depth}<DL><p>")
         for content in self.contents:
             ret.append(content.to_string(depth + 1, indent_char))
@@ -60,7 +67,7 @@ class Link(object):
                 LAST_MODIFIED=self.last_modified,
                 ICON=self.icon)
         attribute = ' '.join(f'{k}="{v}"' for (k, v) in attributes.items() if v is not None)
-        return f"{indent_char * depth}<DT><A {attribute}>{self.name}</A>"
+        return f"{indent_char * depth}<DT><A {attribute}>{html.escape(self.name).replace('&#x27;', '&#39;')}</A>"
 
 def parse_chrome(args):
     target_file_path = args.bookmark_file_path
@@ -73,7 +80,7 @@ def parse_chrome(args):
     soup = bs4.BeautifulSoup(content, "lxml")
     root_node = soup.dl
     root_folder = Folder("Bookmarks")
-    
+
     def _crawl_node(parent_folder, content_node):
         for node in content_node.find_all("dt", recursive=False):        
             if node.h3:
@@ -99,8 +106,40 @@ def parse_chrome(args):
                 continue
     
     _crawl_node(root_folder, root_node)
+        
+    folder_cache = dict() # key: absolute_name, value: Folder
+    new_root_folder = Folder("New Bookmarks")
+    folder_cache[root_folder.absolute_name] = new_root_folder
+    
+    def _crawl_node2(parent_folder):
+        for content in parent_folder.contents:
+            if isinstance(content, Folder):
+                if not content.absolute_name in folder_cache:
+                    new_folder = Folder(
+                            content.name,
+                            content.add_date,
+                            content.last_modified,
+                            content.personal_toolbar_folder,
+                            )
+                    folder_cache[content.absolute_name] = new_folder
+                    folder_cache[content.parent.absolute_name].add(new_folder)
+                    
+                _crawl_node2(content)
+                continue
+            if isinstance(content, Link):
+                new_link = Link(
+                        content.name,
+                        content.href,
+                        content.add_date,
+                        content.last_modified,
+                        content.icon,
+                        )
+                folder_cache[content.parent.absolute_name].add(new_link)
+                continue
 
-    return root_folder
+    _crawl_node2(root_folder)
+
+    return new_root_folder
     
     
 
@@ -124,7 +163,7 @@ def main():
 <H1>Bookmarks</H1>
 {root_folder.to_string(0)}
 """
-        args.bookmark_output_file_path.write_text(output, encoding=args.bookmark_file_encoding)
+        args.bookmark_output_file_path.write_text(output.replace("\n", "\r\n"), encoding=args.bookmark_file_encoding)
 
 if __name__ == "__main__":
     main()
