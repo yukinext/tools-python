@@ -37,12 +37,12 @@ class Folder(object):
                 ADD_DATE=self.add_date,
                 LAST_MODIFIED=self.last_modified,
                 PERSONAL_TOOLBAR_FOLDER=self.personal_toolbar_folder)
-        attribute = ' '.join(f'{k}="{v}"' for (k, v) in attributes.items() if v is not None)
+        attribute = ' '.join(f'{k}="{v}"' for (k, v) in sorted(attributes.items()) if v is not None)
         ret = []
         if self.parent:
             ret.append(f"{indent_char * depth}<DT><H3 {attribute}>{html.escape(self.name).replace('&#x27;', '&#39;')}</H3>")
         ret.append(f"{indent_char * depth}<DL><p>")
-        for content in self.contents:
+        for content in sorted(self.contents, key=lambda c: (str(type(c)), c.href if hasattr(c, "href") else None, c.name)):
             ret.append(content.to_string(depth + 1, indent_char))
         ret.append(f"{indent_char * depth}</DL><p>")
         
@@ -66,7 +66,7 @@ class Link(object):
                 ADD_DATE=self.add_date,
                 LAST_MODIFIED=self.last_modified,
                 ICON=self.icon)
-        attribute = ' '.join(f'{k}="{v}"' for (k, v) in attributes.items() if v is not None)
+        attribute = ' '.join(f'{k}="{v}"' for (k, v) in sorted(attributes.items()) if v is not None)
         return f"{indent_char * depth}<DT><A {attribute}>{html.escape(self.name).replace('&#x27;', '&#39;')}</A>"
 
 def parse_chrome(args):
