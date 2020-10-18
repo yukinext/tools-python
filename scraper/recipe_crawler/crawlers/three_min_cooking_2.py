@@ -109,7 +109,8 @@ class ThreeMinCooking2RecipeCrawler(bases.RecipeCrawlerTemplate):
                         
                         image_urls = []
                         for img in howto_memo_item.find_all("img"):
-                            if ("class" in img) and img["class"] != "howto-memo-icon":
+                            # "data:" for https://www.ntv.co.jp/3min/recipe/20201024/
+                            if ("class" in img) and img["class"] != "howto-memo-icon" and not img["src"].startswith("data:"):
                                 image_urls.append(img["src"])
                         
                         recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
@@ -133,7 +134,9 @@ class ThreeMinCooking2RecipeCrawler(bases.RecipeCrawlerTemplate):
                     
                     image_urls = []
                     for img in recipe_step.find_all("img"):
-                        image_urls.append(img["src"])
+                        # "data:" for https://www.ntv.co.jp/3min/recipe/20201024/
+                        if not img["src"].startswith("data:"):
+                            image_urls.append(img["src"])
                     
                     recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
 
