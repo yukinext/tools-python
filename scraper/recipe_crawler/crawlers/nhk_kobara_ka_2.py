@@ -68,6 +68,34 @@ class NhkKobaraSuitemasenka2RecipeCrawler(bases.RecipeCrawlerTemplate):
             recipe_areas.append(lines)
             return recipe_areas
         
+        for recipe_title_node in detail_soup.find_all("h1", text=re.compile(r"「.*」")):
+            for recipe_area in get_recipe_areas(recipe_title_node.parent.parent.find("ul", "answers").text.splitlines()):
+                recipe = copy.deepcopy(overview_recipe)
+                recipe.cooking_name = recipe_title_node.text.translate(self.__class__._TABLE_REMOVE_KAKKO).strip()
+                
+                is_material_area = False
+                is_recipe_step_area = False
+                for l in recipe_area:
+                    if len(l.strip()) == 0:
+                        continue
+                    
+                    if -1 < l.find("■材料"):
+                        is_material_area = True
+                        recipe.materials.append(RecipeText(l.replace("■材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO)))
+                        continue
+                    if -1 < l.find("■作り方"):
+                        is_material_area = False
+                        is_recipe_step_area = True
+                        continue
+                    
+                    if is_material_area:
+                        recipe.materials.extend([RecipeText(m.replace(":", ": ")) for m in l.split()])
+                    elif is_recipe_step_area:
+                        recipe.recipe_steps.append(RecipeText(l.replace("\t", " ")))
+    
+                yield recipe
+                
+                
         for recipe_title_node in detail_soup.find_all("span", text=re.compile(r".*レシピ")):
             for recipe_area in get_recipe_areas(recipe_title_node.parent.find_next_sibling("ul").text.splitlines()):
                 recipe = copy.deepcopy(overview_recipe)
