@@ -30,7 +30,9 @@ class EvernoteTranslator(object):
 {{ recipe.cooking_name_sub }}<br />
 {%- endif %}
 {%- for image_url in recipe.image_urls %}
+{%- if image_url in image_resources %}
 <en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" /><br />
+{%- endif %}
 {%- endfor %}
 
 {%- if 0 < recipe.materials|length %}
@@ -40,8 +42,10 @@ class EvernoteTranslator(object):
     <li>
         <div>{{ material.text }}</div>
 {%- for image_url in material.image_urls %}
+{%- if image_url in image_resources %}
         <br /><en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" />
-{%- endfor %}        
+{%- endif %}
+{%- endfor %}
 {%- for important_point in material.important_points %}
         <br /><strong>{{ important_point }}</strong>
 {%- endfor %}        
@@ -60,8 +64,10 @@ class EvernoteTranslator(object):
         <div><p>{{ recipe_step_l }}</p></div>
         {%- endfor %}
 {%- for image_url in recipe_step.image_urls %}
+{%- if image_url in image_resources %}
         <br /><en-media type="{{ image_resources[image_url].mime }}" hash="{{ image_resources[image_url].data.bodyHash }}" />
-{%- endfor %}        
+{%- endif %}
+{%- endfor %} 
 {%- for important_point in recipe_step.important_points %}
         <br /><strong>{{ important_point }}</strong>
 {%- endfor %}        
