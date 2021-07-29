@@ -71,7 +71,7 @@ nikomaru:
     enable: true
     program_name: "KSB にこまるキッチン"
     entry_urls:
-        - "http://www.ksb.co.jp/250/paradise/list"
+        - "http://www.ksb.co.jp/250/paradise/recipe/"
 oishimeshi:
     enable: true
     program_name: "CSネット コープのおいしめし"

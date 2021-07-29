@@ -21,11 +21,12 @@ class NikomaruKitchenRecipeCrawler(bases.RecipeCrawlerTemplate):
 
     def _get_recipe_overviews(self, overview_soup, entry_url):
         recipes = dict() # key: Recipe.id, value: Recipe
-        for item in overview_soup.find_all("dl"):
+        for item in overview_soup.find("ul", "recipe-list").find_all("li"):
             recipe = Recipe()
-            name, date, _ = item.find_all("dd")
-            recipe.detail_url = urllib.parse.urljoin(entry_url, name.a["href"])
-            recipe.id = int(re.search(r".*/(\d+)$", recipe.detail_url).group(1))
+            name = item.find("p", "name")
+            date = item.find("p", "date")
+            recipe.detail_url = item.a["href"]
+            recipe.id = int(re.search(r".*/(\d+)/$", recipe.detail_url).group(1))
             recipe.cooking_name = name.text
             recipe.program_name = self.program_name
             recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", date.text).groups()])
@@ -39,12 +40,12 @@ class NikomaruKitchenRecipeCrawler(bases.RecipeCrawlerTemplate):
         """
         recipe = copy.deepcopy(overview_recipe)
 
-        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("div", "photo").img["src"]))
+        recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, detail_soup.find("div", "photo").img["data-src"]))
 
         material_title_node = detail_soup.find("div", "material")
-        material_title = material_title_node.h4.text.replace("材料", "").strip()
+        material_title = material_title_node.h4.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
         if material_title:
-            recipe.materials.append(RecipeText("（{}）".format(material_title)))
+            recipe.materials.append(RecipeText("{}".format(material_title)))
         for material in material_title_node.find_all("li"):
             texts = [m.text for m in material.find_all("span")]
             if "".join([t.strip() for t in texts]) == "":
