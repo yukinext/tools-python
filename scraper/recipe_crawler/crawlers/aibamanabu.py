@@ -14,7 +14,6 @@ import logging
 import copy
 import datetime
 import json
-import chardet
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
     site_name = "aibamanabu"
 
     def _convert_overview_content(self, raw_content):
-        return json.loads(raw_content, encoding=chardet.detect(raw_content))
+        return json.loads(raw_content)
 
     def _get_recipe_overviews(self, jdata, entry_url):
         recipes = dict() # key: Recipe.id, value: Recipe
