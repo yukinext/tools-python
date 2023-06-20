@@ -103,7 +103,7 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 logger.info("{}: rename : {} -> {}".format(self.__class__.site_name, target_fn.name, new_target_fn.name))
                 target_fn.rename(new_target_fn)
         if len(skipped_recipe_ids):
-            logger.warn("{}: not exists in overview. skip recipe id(s): {}".format(self.__class__.site_name, ",".join(skipped_recipe_ids)))
+            logger.warn("{}: not exists in overview. skip recipe id(s): {}".format(self.__class__.site_name, ",".join([str(id) for id in skipped_recipe_ids])))
     
     def _expand_entry_urls(self):
         return self.entry_urls
