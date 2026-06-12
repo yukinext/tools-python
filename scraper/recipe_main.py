@@ -21,14 +21,15 @@ import sys
 import time
 
 import dateutil.parser
+import urllib3
 import yaml
+from urllib3.exceptions import InsecureRequestWarning
 
-# from urllib3 import InsecureRequestWarning
 import recipe_crawler.crawlers
 import recipe_crawler.models
 import recipe_crawler.translators
 
-# urllib3.disable_warnings(InsecureRequestWarning)
+urllib3.disable_warnings(InsecureRequestWarning)
 
 yaml.add_representer(
     collections.OrderedDict,
