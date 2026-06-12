@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Fri Aug 30 22:03:12 2019
 
 @author: yuki_next
 """
 
-from . import bases
-from recipe_crawler.models import Recipe, RecipeText
-import urllib
-import re
-import logging
 import copy
 import datetime
 import json
+import logging
+import re
+import urllib.parse
+
+from recipe_crawler.models import Recipe, RecipeText
+
+from . import bases
 
 logger = logging.getLogger(__name__)
+
 
 class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
     site_name = "aibamanabu"
@@ -24,7 +26,7 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
         return json.loads(raw_content)
 
     def _get_recipe_overviews(self, jdata, entry_url):
-        recipes = dict() # key: Recipe.id, value: Recipe
+        recipes = dict()  # key: Recipe.id, value: Recipe
         for item in jdata:
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, "../../" + item["url"])
@@ -32,11 +34,13 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
             recipe.cooking_name_sub = item["title"]
             recipe.program_name = self.program_name
             program_date_str = item["date"]
-            recipe.program_date = datetime.date(*[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str).groups()])
+            recipe.program_date = datetime.date(
+                *[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str).groups()]
+            )
             recipes[recipe.id] = recipe
 
         return recipes
-    
+
     def _recipe_details_generator(self, detail_soup, overview_recipe):
         """
         must deepcopy "recipe" before use
@@ -46,29 +50,29 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
         for title_node in title_nodes:
             recipe = copy.deepcopy(overview_recipe)
             recipe.cooking_name = title_node.text.translate(self.__class__._TABLE_REMOVE_KAKKO)
-            
+
             img_node = title_node.find_next_sibling("div")
-            
+
             if img_node:
                 if img_node.img:
-                    recipe.image_urls.append(
-                            urllib.parse.urljoin(
-                                    recipe.detail_url, img_node.img["src"]))
-    
+                    recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, img_node.img["src"]))
+
             material_node = title_node.find_next_sibling("div", text=re.compile(r"\[材料\].*"))
             if material_node:
-                material_title = material_node \
-                                    .text \
-                                    .replace("[材料]", "") \
-                                    .translate(self.__class__._TABLE_REPLACE_MARUKAKKO)
+                material_title = material_node.text.replace("[材料]", "").translate(
+                    self.__class__._TABLE_REPLACE_MARUKAKKO
+                )
                 if len(material_title):
                     recipe.materials.append(RecipeText(material_title))
                 for dl in material_node.find_next_sibling("div").select("dl"):
-                    recipe.materials.append(RecipeText(
-                            dl.text.strip().replace("\n", ": ")))
-    
+                    recipe.materials.append(RecipeText(dl.text.strip().replace("\n", ": ")))
+
             recipe_steps_title_node = title_node.find_next_sibling("div", text="[作り方]")
             for i, recipe_step in enumerate(recipe_steps_title_node.find_next_sibling("ol").find_all("li")):
-                recipe.recipe_steps.append(RecipeText("（{}）{}".format(i + 1, recipe_step.text),))
-            
+                recipe.recipe_steps.append(
+                    RecipeText(
+                        f"（{i + 1}）{recipe_step.text}",
+                    )
+                )
+
             yield recipe
