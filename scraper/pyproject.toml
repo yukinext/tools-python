@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recipe_cralwer"
+version = "0.0.1"
+description = "Recipe Site Crawler"
+readme = { file = "docs/README.rst", content-type = "text/x-rst" }
+requires-python = ">=3.14"
+license = { text = "MIT" }
+authors = [
+	{ name = "Yuki", email = "yuki_next@mac.com" },
+]
+keywords = ["Python", "Python3", "web scraping", "crawler", "cooking recipe"]
+classifiers = [
+	"Development Status :: 5 - Production/Stable",
+	"Intended Audience :: Developers",
+	"Natural Language :: Japanese",
+	"License :: OSI Approved :: MIT License",
+	"Programming Language :: Python",
+	"Programming Language :: Python :: 3.7",
+	"Topic :: Utilities",
+]
+dependencies = [
+    "dateutils>=0.6.12",
+    "evernote3>=1.25.14",
+    "jinja2>=3.1.6",
+    "pytz>=2026.2",
+    "pyyaml>=6.0.3",
+    "requests>=2.34.2",
+    "urllib3>=2.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yukinext/tools-python/tree/master/scraper"
+Download = "https://github.com/yukinext/tools-python/"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-pep8", "pytest-flakes"]
+
+[project.scripts]
+crawl-recipe = "recipe_main:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.20.1",
+    "ruff>=0.15.11",
+    "types-pyyaml>=6.0.12.20260408",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+exclude = ["migrations/", "tests/"]
+select = ["E", "W", "F"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["duplicate_filechecker"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
