@@ -12,6 +12,8 @@ import logging
 import re
 import urllib.parse
 
+import bs4
+
 from recipe_crawler.models import Recipe, RecipeText
 
 from . import bases
@@ -28,24 +30,32 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
     def _get_recipe_overviews(self, jdata, entry_url):
         recipes = dict()  # key: Recipe.id, value: Recipe
         for item in jdata:
-            recipe = Recipe()
-            recipe.detail_url = urllib.parse.urljoin(entry_url, "../../" + item["url"])
-            recipe.id = int(re.search(r".*/(\d+)/", recipe.detail_url).group(1))
-            recipe.cooking_name_sub = item["title"]
-            recipe.program_name = self.program_name
-            program_date_str = item["date"]
-            recipe.program_date = datetime.date(
-                *[int(v) for v in re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", program_date_str).groups()]
+            recipe = Recipe(
+                detail_url=urllib.parse.urljoin(entry_url, "../../" + item["url"]),
+                id=None,
+                cooking_name=None,
+                cooking_name_sub=item["title"],
+                program_name=self.program_name,
             )
+            if recipe.detail_url:
+                m = re.search(r".*/(\d+)/", recipe.detail_url)
+                if m:
+                    recipe.id = int(m.group(1))
+            if "date" in item:
+                m = re.match(r"(\d+)\D+(\d+)\D+(\d+)\D*", item["date"])
+                if m:
+                    recipe.program_date = datetime.date(*[int(v) for v in m.groups()])
             recipes[recipe.id] = recipe
 
         return recipes
 
-    def _recipe_details_generator(self, detail_soup, overview_recipe):
+    def _recipe_details_generator(self, detail_soup: bs4.BeautifulSoup, overview_recipe: Recipe):
         """
         must deepcopy "recipe" before use
         """
-        overview_recipe.cooking_name_sub = " ".join(detail_soup.h3.text.split()[1:])
+        overview_recipe.cooking_name_sub = (
+            " ".join(detail_soup.h3.text.split()[1:]) if detail_soup.h3 else overview_recipe.cooking_name_sub
+        )
         title_nodes = detail_soup.select("div[class=ttl]")
         for title_node in title_nodes:
             recipe = copy.deepcopy(overview_recipe)
@@ -53,9 +63,11 @@ class AibamanabuRecipeCrawler(bases.RecipeCrawlerTemplate):
 
             img_node = title_node.find_next_sibling("div")
 
-            if img_node:
-                if img_node.img:
-                    recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, img_node.img["src"]))
+            if recipe.detail_url:
+                if img_node:
+                    if img_node.img:
+                        if img_node.img["src"]:
+                            recipe.image_urls.append(urllib.parse.urljoin(recipe.detail_url, str(img_node.img["src"])))
 
             material_node = title_node.find_next_sibling("div", text=re.compile(r"\[材料\].*"))
             if material_node:

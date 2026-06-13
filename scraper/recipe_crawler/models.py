@@ -6,31 +6,26 @@ Created on Fri Aug 30 21:15:51 2019
 """
 
 import datetime
-import pprint
+from dataclasses import dataclass, field
+from typing import Any
 
 
+@dataclass
+class RecipeText:  # レシピ内の各ステップに対応するテキストと画像URLを格納するクラス
+    text: str  # ステップのテキスト
+    image_urls: list[str] = field(default_factory=list)  # ステップに紐づく画像のURLリスト
+    important_points: list[str] = field(default_factory=list)  # ステップの重要なポイントのリスト
+
+
+@dataclass
 class Recipe:
-    def __init__(self):
-        self.id = None
-        self.detail_url = None
-        self.image_urls = list()  # original image source urls
-        self.cooking_name = None  # 料理名
-        self.cooking_name_sub = None
-        self.program_name = None  # 番組名
-        self.program_date = datetime.date.today()  # 番組日付
-        self.materials = list()  # 材料. value: RecipeText
-        self.recipe_steps = list()  # 作り方: RecipeText
-        self.important_points = list()  # RecipeText
-
-    def __repr__(self):
-        return self.__class__.__name__ + pprint.pformat(self.__dict__)
-
-
-class RecipeText:
-    def __init__(self, text, image_urls=None, important_points=None):
-        self.text = text
-        self.image_urls = image_urls if image_urls else []
-        self.important_points = important_points if important_points else []
-
-    def __repr__(self):
-        return self.__class__.__name__ + pprint.pformat(self.__dict__)
+    id: Any | None  # レシピID. 形式はサイトごとに異なるが、基本的にはURLの一部を使用することが多い
+    detail_url: str | None  # レシピの詳細ページURL
+    cooking_name: str | None  # 料理名
+    cooking_name_sub: str | None  # 料理名のサブタイトル（あれば）
+    program_name: str | None  # 番組名
+    image_urls: list[str] = field(default_factory=list)  # レシピ全体に紐づく画像のURLリスト
+    program_date: datetime.date = datetime.date.today()  # 番組日付
+    materials: list[RecipeText] = field(default_factory=list)  # 材料. value: RecipeText
+    recipe_steps: list[RecipeText] = field(default_factory=list)  # 作り方: RecipeText
+    important_points: list[RecipeText] = field(default_factory=list)  # 重要なポイント: RecipeText

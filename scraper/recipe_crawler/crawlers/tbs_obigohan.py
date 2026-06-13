@@ -10,6 +10,7 @@ import copy
 import logging
 import re
 import urllib
+import urllib.parse
 
 import dateutil
 import requests
@@ -49,17 +50,25 @@ class TbsObigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
             urllib.parse.urljoin(entry_url, waku.a["href"]) for waku in overview_soup.find_all("div", "waku") if waku.a
         ]
         for detail_url in detail_urls:
-            recipe = Recipe()
+            recipe = Recipe(
+                detail_url=detail_url,
+                program_name=self.program_name,
+                id=None,
+                cooking_name=None,
+                cooking_name_sub=None,
+            )
+            if recipe.detail_url:
+                m = re.search(r"/\D*(\d+)\D*$", recipe.detail_url)
+                if m:
+                    recipe.id = int(m.group(1))
+            if recipe.id:
+                recipe.program_date = dateutil.parser.parse(str(recipe.id))
 
-            recipe.detail_url = detail_url
-            recipe.id = int(re.search(r"/\D*(\d+)\D*$", recipe.detail_url).group(1))
-            recipe.program_name = self.program_name
-            recipe.program_date = dateutil.parser.parse(str(recipe.id))
             recipes[recipe.id] = recipe
 
         return recipes
 
-    def _recipe_details_generator(self, detail_soup, overview_recipe):
+    def _recipe_details_generator(self, detail_soup: BeautifulSoup, overview_recipe: Recipe):
         """
         must deepcopy "recipe" before use
         """
@@ -73,8 +82,11 @@ class TbsObigohanRecipeCrawler(bases.RecipeCrawlerTemplate):
             if pic_sub:
                 for class_v in pic_sub["class"]:
                     if class_v.lower().startswith("photo"):
-                        image_url = urllib.parse.urljoin(recipe.detail_url, f"../img/recipe/{recipe.id}/{class_v}.jpg")
-                        recipe.image_urls.append(image_url)
+                        if recipe.detail_url:
+                            image_url = urllib.parse.urljoin(
+                                recipe.detail_url, f"../img/recipe/{recipe.id}/{class_v}.jpg"
+                            )
+                            recipe.image_urls.append(image_url)
 
             material_title_node = recipe_area_node.find("div", "material_box")
             material_title = material_title_node.find("span", "people")

@@ -8,7 +8,9 @@ Created on Fri Aug 30 22:01:23 2019
 import copy
 import logging
 import re
+from typing import Any
 
+import bs4
 import dateutil
 
 from recipe_crawler.models import Recipe, RecipeText
@@ -21,17 +23,23 @@ logger = logging.getLogger(__name__)
 class OishimeshiRecipeCrawler(bases.RecipeCrawlerTemplate):
     site_name = "oishimeshi"
 
-    def _get_recipe_overviews(self, overview_soup, entry_url):
+    def _get_recipe_overviews(self, overview_soup: bs4.BeautifulSoup, entry_url: str) -> dict[Any, Recipe]:
         recipes = dict()  # key: Recipe.id, value: Recipe
         for item in overview_soup.find_all("div", "titletext"):
-            recipe = Recipe()
             tmp = item.find("p", "title")
-            recipe.detail_url = tmp.a["href"]
-            program_date_str = re.search(r"date=(\d+)\D?", recipe.detail_url).group(1)
-            recipe.id = int(program_date_str)
-            recipe.cooking_name = tmp.text
-            recipe.program_name = self.program_name
-            recipe.program_date = dateutil.parser.parse(program_date_str)
+            recipe = Recipe(
+                detail_url=tmp.a["href"],
+                id=None,
+                cooking_name=tmp.text,
+                cooking_name_sub=None,
+                program_name=self.program_name,
+            )
+            if recipe.detail_url:
+                m = re.search(r"date=(\d+)\D?", recipe.detail_url)
+                if m:
+                    program_date_str = m.group(1)
+                    recipe.id = int(program_date_str)
+                    recipe.program_date = dateutil.parser.parse(program_date_str)
             recipes[recipe.id] = recipe
 
         return recipes

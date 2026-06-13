@@ -40,23 +40,28 @@ class TscGrandmotherKitchenRecipeCrawler(bases.RecipeCrawlerTemplate):
     def _get_recipe_overviews(self, overview_soup, entry_url):
         recipes = dict()  # key: Recipe.id, value: Recipe
         for item in overview_soup.find_all("article", "post-archive"):
-            recipe = Recipe()
-
             cns_buf = [
                 l.translate(self.__class__._TABLE_REMOVE_KAKKO) for l in reversed(item.h2.get_text("\n").splitlines())
             ]
             cns_buf.insert(1, item.find("div", "recipe-archive-cast").text)
 
-            recipe.cooking_name_sub = "/".join(cns_buf)
-            recipe.detail_url = item.a["href"]
-            recipe.id = int(re.search(r"/(\d+)\D*$", recipe.detail_url).group(1))
-            recipe.program_name = self.program_name
-            recipe.program_date = datetime.date(
-                *[
-                    int(s)
-                    for s in re.search(r"(\d+)\D+(\d+)\D+(\d+)\D+", item.find("div", "recipe-onairs").text).groups()
-                ]
+            recipe = Recipe(
+                detail_url=item.a["href"],
+                program_name=self.program_name,
+                id=None,
+                cooking_name=None,
+                cooking_name_sub="/".join(cns_buf),
             )
+            if recipe.detail_url:
+                m = re.search(r"/(\d+)\D*$", recipe.detail_url)
+                if m:
+                    recipe.id = int(m.group(1))
+            recipe_onair_node = item.find("div", "recipe-onairs")
+            if recipe_onair_node:
+                m = re.search(r"(\d+)\D+(\d+)\D+(\d+)\D+", recipe_onair_node.text)
+                if m:
+                    recipe.program_date = datetime.date(*[int(s) for s in m.groups()])
+
             recipes[recipe.id] = recipe
 
         return recipes
