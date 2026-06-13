@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Fri Aug 30 21:26:59 2019
 
 @author: yuki_next
 """
 
-import recipe_crawler.models
-import jinja2
+import hashlib
 import logging
-import evernote.edam.type.ttypes as Types
-import requests
+import mimetypes
 import pathlib
 import urllib
-import hashlib
-import mimetypes
+import urllib.parse
+
+import evernote.edam.type.ttypes as Types  # noqa: N812
+import jinja2
+import requests
+
+import recipe_crawler.models
 
 logger = logging.getLogger(__name__)
 
-class EvernoteTranslator(object):
+
+class EvernoteTranslator:
     default_tag_names = ["recipe", "レシピ"]
-    
+
     _template = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
 <en-note>
@@ -91,39 +94,41 @@ class EvernoteTranslator(object):
 
     @property
     def title(self):
-        ret = "{}「{}」".format(self.recipe.program_name, self.recipe.cooking_name)
+        ret = f"{self.recipe.program_name}「{self.recipe.cooking_name}」"
         if self.recipe.program_date:
-            ret +=  " {:%Y.%m.%d}".format(self.recipe.program_date)
+            ret += f" {self.recipe.program_date:%Y.%m.%d}"
         return ret
 
     @property
     def body_resources(self):
-        image_resources = dict() # key: image_url, value: resource
-        
+        image_resources = dict()  # key: image_url, value: resource
+
         image_resources.update(self.__class__._get_create_evernote_resource_dict(self.recipe.image_urls))
 
         for material in self.recipe.materials:
             image_resources.update(self.__class__._get_create_evernote_resource_dict(material.image_urls))
-        
+
         for recipe_step in self.recipe.recipe_steps:
             image_resources.update(self.__class__._get_create_evernote_resource_dict(recipe_step.image_urls))
-        
-        return image_resources, jinja2.Template(self.__class__._template).render(recipe=self.recipe, image_resources=image_resources)
-    
+
+        return image_resources, jinja2.Template(self.__class__._template).render(
+            recipe=self.recipe, image_resources=image_resources
+        )
+
     @property
     def attributes(self):
         ret = Types.NoteAttributes()
         ret.sourceURL = self.recipe.detail_url
-        
+
         return ret
-    
+
     @property
     def tag_names(self):
         ret = set(self.__class__.default_tag_names)
         ret.add(self.recipe.program_name)
         if self.recipe.program_date:
-            ret.add("{:%Y.%m}".format(self.recipe.program_date))
-            ret.add("{:%Y}".format(self.recipe.program_date))
+            ret.add(f"{self.recipe.program_date:%Y.%m}")
+            ret.add(f"{self.recipe.program_date:%Y}")
         if self.site_config.get("tag_names"):
             ret.update(self.site_config["tag_names"])
         return ret
@@ -135,31 +140,29 @@ class EvernoteTranslator(object):
             resource = EvernoteTranslator._get_create_evernote_resource(source_url)
             if resource:
                 ret[source_url] = resource
-        
+
         return ret
 
     @staticmethod
     def _get_create_evernote_resource(source_url):
-        logger.debug("get: {}".format(source_url))
+        logger.debug(f"get: {source_url}")
         res = requests.get(source_url)
         if res.ok:
             attachment_filename = pathlib.Path(urllib.parse.urlparse(source_url).path).name
-            return EvernoteTranslator._create_evernote_resource(
-                        attachment_filename, res.content, source_url=source_url)
-    
+            return EvernoteTranslator._create_evernote_resource(attachment_filename, res.content, source_url=source_url)
+
     @staticmethod
     def _create_evernote_resource(attachment_filename, byte_data, source_url=None):
         data = Types.Data(
-                bodyHash=hashlib.md5(byte_data).hexdigest(),
-                size=len(byte_data),
-                body=byte_data,
-                )
+            bodyHash=hashlib.md5(byte_data).hexdigest(),
+            size=len(byte_data),
+            body=byte_data,
+        )
         return Types.Resource(
-                data=data,
-                mime=mimetypes.guess_type(attachment_filename)[0],
-                attributes=Types.ResourceAttributes(
-                        sourceURL=source_url,
-                        fileName=attachment_filename,
-                        ),
-                )
-    
+            data=data,
+            mime=mimetypes.guess_type(attachment_filename)[0],
+            attributes=Types.ResourceAttributes(
+                sourceURL=source_url,
+                fileName=attachment_filename,
+            ),
+        )

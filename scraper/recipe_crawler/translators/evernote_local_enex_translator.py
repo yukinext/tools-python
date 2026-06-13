@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Wed Jun 10 07:08:21 2020
 
 @author: yuki_next
 """
 
-import recipe_crawler.models
-import jinja2
-import logging
-import evernote.edam.type.ttypes as Types
-import pytz
-import datetime
 import base64
+import datetime
+import logging
+
+import evernote.edam.type.ttypes as Types
+import jinja2
+import pytz
+
+import recipe_crawler.models
 
 logger = logging.getLogger(__name__)
 
-def bin_to_base64(b_data):
-    return base64.b64encode(b_data).decode('utf-8')
 
-class EvernoteLocalEnexTranslator(object):
+def bin_to_base64(b_data):
+    return base64.b64encode(b_data).decode("utf-8")
+
+
+class EvernoteLocalEnexTranslator:
     _template = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">
 <en-export>
@@ -28,7 +31,7 @@ class EvernoteLocalEnexTranslator(object):
 {%- endfor %}
 </en-export>
 """
-    
+
     _template_note = """<note><title>{{ note.title }}</title><content><![CDATA[{{ note.content }}]]></content>
 <created>{{ note.created }} </created><updated>{{ note.updated }}</updated>
 {%- for tag in note.tagNames %}
@@ -58,6 +61,7 @@ class EvernoteLocalEnexTranslator(object):
 {%- endfor %}
 </note>
 """
+
     def __init__(self, recipe, site_config):
         assert isinstance(recipe, recipe_crawler.models.Recipe)
         self.recipe = recipe
@@ -72,16 +76,16 @@ class EvernoteLocalEnexTranslator(object):
         trans = recipe_crawler.translators.EvernoteTranslator(self.recipe, self.site_config)
         note_title = trans.title
 
-        logger.info("create note: {}".format(note_title))
+        logger.info(f"create note: {note_title}")
         resources, body = trans.body_resources
         attributes = trans.attributes
-        
+
         note = Types.Note(title=note_title, content=body, resources=resources.values(), attributes=attributes)
         note.tagNames = trans.tag_names
         note.created = datetime.datetime.now().astimezone(pytz.timezone("UTC")).strftime("%Y%m%dT%H%M%SZ")
         note.updated = note.created
-        
+
         tmpl = jinja2.Template(self.__class__._template_note)
-        
-        tmpl.globals['bin_to_base64'] = bin_to_base64
+
+        tmpl.globals["bin_to_base64"] = bin_to_base64
         return note.title, tmpl.render(note=note)

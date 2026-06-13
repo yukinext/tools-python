@@ -120,7 +120,7 @@ def store_evernote(recipes, args, site_config, evernote_cred, is_note_exist_chec
 
 
 def change_tag_evernote(args, evernote_cred):
-    import evernote.edam.notestore.ttypes as NSTypes
+    import evernote.edam.notestore.ttypes as NSTypes  # noqa: N812
     from evernote.api.client import EvernoteClient
 
     client = EvernoteClient(token=evernote_cred["developer_token"], sandbox=evernote_cred["is_sandbox"])

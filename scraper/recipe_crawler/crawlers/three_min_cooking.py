@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Fri Aug 30 21:58:43 2019
 
 @author: yuki_next
 """
 
-from . import bases
-from recipe_crawler.models import Recipe, RecipeText
-import urllib
-import re
+import copy
 import logging
+import re
+import urllib
+
 import dateutil
 import requests
-import copy
 from bs4 import BeautifulSoup
 
+from recipe_crawler.models import Recipe, RecipeText
+
+from . import bases
+
 logger = logging.getLogger(__name__)
+
 
 class ThreeMinCookingRecipeCrawler(bases.RecipeCrawlerTemplate):
     site_name = "three_minutes_cooking"
@@ -44,8 +47,8 @@ class ThreeMinCookingRecipeCrawler(bases.RecipeCrawlerTemplate):
                     other_recipe.detail_url = urllib.parse.urljoin(detail_url, other_recipe_node.a["href"])
                     other_recipe.id = re.search(r".*/(.*)\.html", other_recipe.detail_url).group(1)
                     return other_recipe
-        
-        recipes = dict() # key: Recipe.id, value: Recipe
+
+        recipes = dict()  # key: Recipe.id, value: Recipe
         for item in [item for item in overview_soup.find_all("div", "waku") if item.a]:
             recipe = Recipe()
             recipe.detail_url = urllib.parse.urljoin(entry_url, item.a["href"])
@@ -57,7 +60,7 @@ class ThreeMinCookingRecipeCrawler(bases.RecipeCrawlerTemplate):
                 recipes[other_recipe.id] = other_recipe
 
         return recipes
-    
+
     def _recipe_details_generator(self, detail_soup, overview_recipe):
         """
         must deepcopy "recipe" before use
@@ -71,8 +74,10 @@ class ThreeMinCookingRecipeCrawler(bases.RecipeCrawlerTemplate):
 
         material_title_node = detail_soup.find("div", "ingredient")
         recipe_steps_title_node = detail_soup.find("div", "howto")
-        
-        material_title = material_title_node.h4.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
+
+        material_title = (
+            material_title_node.h4.text.replace("材料", "").translate(self.__class__._TABLE_REPLACE_MARUKAKKO).strip()
+        )
         if material_title:
             recipe.materials.append(RecipeText(material_title))
         for material in material_title_node.find_all("tr"):
@@ -84,31 +89,31 @@ class ThreeMinCookingRecipeCrawler(bases.RecipeCrawlerTemplate):
                 buf = ""
                 num = num.text.strip()
                 if len(num):
-                    buf += "（{}）".format(num)
+                    buf += f"（{num}）"
                 buf += step.text.strip()
-                
+
                 image_urls = None
                 if step.img:
                     image_urls = [urllib.parse.urljoin(recipe.detail_url, step.img["src"])]
-                
+
                 recipe.recipe_steps.append(RecipeText(buf, image_urls=image_urls))
             else:  # No.20190824
                 # exists sub steps.
-                recipe.recipe_steps.append(RecipeText(step.next)) # line.1 is title in sub steps
+                recipe.recipe_steps.append(RecipeText(step.next))  # line.1 is title in sub steps
                 for sub_index, step_li in enumerate(step.find_all("li")):
                     image_urls = None
                     if step_li.img:
                         image_urls = [urllib.parse.urljoin(recipe.detail_url, step_li.img["src"])]
-                    recipe.recipe_steps.append(RecipeText("（{}）{}".format(sub_index + 1, step_li.text), image_urls=image_urls))
-        
+                    recipe.recipe_steps.append(RecipeText(f"（{sub_index + 1}）{step_li.text}", image_urls=image_urls))
+
         for appendix in detail_soup.find_all("div", "recipe-box"):
             for i, l in enumerate([t.strip() for t in appendix.get_text("\n").splitlines() if len(t.strip())]):
                 if l.startswith("・"):
                     l = l[1:].strip()
-                
+
                 if i:
-                    l = "　{}".format(l)
-                
+                    l = f"　{l}"
+
                 recipe.important_points.append(RecipeText(l))
-        
+
         yield recipe
