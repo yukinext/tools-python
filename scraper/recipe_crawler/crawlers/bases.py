@@ -9,7 +9,10 @@ import logging
 import pathlib
 import time
 from abc import ABCMeta, abstractmethod
+from collections.abc import Generator
+from typing import Any
 
+import bs4
 import chardet
 import requests
 from bs4 import BeautifulSoup
@@ -23,9 +26,6 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
     site_name = ""
     _TABLE_REMOVE_KAKKO = str.maketrans({"「": "", "」": ""})
     _TABLE_REPLACE_MARUKAKKO = str.maketrans({"(": "（", ")": "）"})
-
-    def __init__(self):
-        pass
 
     def init(self, args, site_config):
         self.program_name = site_config["program_name"]
@@ -106,8 +106,7 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
                 logger.info(f"{self.__class__.site_name}: start : {recipe_id}")
                 content = target_fn.open("rb").read()
                 converted_content = self._convert_detail_content(content)
-                for detail_recipe in self._recipe_details_generator(converted_content, recipes[recipe_id]):
-                    yield detail_recipe
+                yield from self._recipe_details_generator(converted_content, recipes[recipe_id])
 
             except AttributeError:
                 logger.exception("not expected format.")
@@ -125,7 +124,7 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
     def _expand_entry_urls(self):
         return self.entry_urls
 
-    def _is_existed_recipe(self, recipe):
+    def _is_existed_recipe(self, recipe: recipe_crawler.models.Recipe):
         assert isinstance(recipe, recipe_crawler.models.Recipe)
         return (self.cache_dir / str(recipe.id)).exists()
 
@@ -155,11 +154,15 @@ class RecipeCrawlerTemplate(metaclass=ABCMeta):
         return int(target_fn.stem)
 
     @abstractmethod
-    def _get_recipe_overviews(self, overview_soup, entry_url):
+    def _get_recipe_overviews(
+        self, overview_soup: bs4.BeautifulSoup, entry_url: str
+    ) -> dict[Any, recipe_crawler.models.Recipe]:
         pass
 
     @abstractmethod
-    def _recipe_details_generator(self, detail_soup, recipe):
+    def _recipe_details_generator(
+        self, detail_soup: bs4.BeautifulSoup, recipe: recipe_crawler.models.Recipe
+    ) -> Generator[recipe_crawler.models.Recipe]:
         """
         must deepcopy "recipe" before use
         """
